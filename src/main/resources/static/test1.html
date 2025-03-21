@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Esegui Test</title>
+    <meta charset="UTF-8">
+    <meta name="htmx-config" content='{"responseHandling": [{"code":".*", "swap": true}]}' />
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+    <style>
+        body {
+            background-color: #e8f5e9;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .form-container {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            padding: 30px;
+            box-sizing: border-box;
+        }
+
+        form div {
+            margin-bottom: 20px;
+        }
+
+        label {
+            font-size: 1.2rem;
+            color: #555;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        input[type="number"] {
+            width: 10%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        textarea {
+            width: 95%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            border-color: #50a0f7;
+            outline: none;
+        }
+
+        #risultato {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            text-align: center;
+            min-height: 50px;
+        }
+
+        .successo {
+            background-color: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .errore {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+
+        input[type="submit"], button {
+            background-color: #3c9aff;
+            color: #fff;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 100%;
+        }
+
+        input[type="submit"]:hover, button:hover {
+            background-color: #3091f8;
+        }
+
+        .test-unita {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            font-size: 1rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .consegna-domanda{
+            width: 95%;
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            font-size: 1rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .test-fallito {
+            background-color: #fff3cd;
+            border: 2px solid #ffeeba;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .test-evidenziato {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Esegui Test</h1>
+
+    <div class="form-container">
+        <form
+            hx-post="/eseguiTest"
+            hx-target="#risultato"
+            hx-swap="innerHTML"
+            hx-trigger="submit">
+
+            <!-- Campo ID Domanda -->
+            <div>
+                <label for="idDomanda">ID Domanda:</label>
+                <input
+                type="number"
+                id="idDomanda"
+                name="idDomanda"
+                required
+                hx-trigger="input"
+                hx-include="[name='idDomanda']">
+
+            <div
+                hx-get="/mostraTest"
+                hx-target="#test-unita"
+                hx-trigger="input from:#idDomanda"
+                hx-include="#idDomanda">
+            </div>
+
+            <div
+                hx-get="/mostraDomanda"
+                hx-target="#consegna-domanda"
+                hx-trigger="input from:#idDomanda"
+                hx-include="#idDomanda">
+            </div>
+
+            </div>
+
+            <div id="consegna-domanda" class="consegna-domanda">
+			    Consegna Domanda
+			</div>
+
+			<!-- Div del risultato -->
+			<div id="risultato"></div>
+
+            <!-- Campo Codice -->
+            <div>
+                <label for="codice">Codice:</label>
+                <textarea id="codice" name="codice" rows="10" required></textarea>
+            </div>
+
+            <!-- Pulsante di invio -->
+            <div>
+                <input type="submit" value="Esegui Test">
+            </div>
+
+        </form>
+
+		<!-- Mostra i test di unità -->
+		<div id="test-unita" class="test-unita">
+		    Test Domanda
+		</div>
+    </div>
+
+</body>
+</html>

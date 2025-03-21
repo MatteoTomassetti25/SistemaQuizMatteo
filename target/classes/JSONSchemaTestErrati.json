@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-01/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "test": {
+        "type": "string"
+      },
+      "errore": {
+        "type": "string"
+      }
+    },
+    "required": ["test", "errore"],
+    "additionalProperties": false
+  }
+}
