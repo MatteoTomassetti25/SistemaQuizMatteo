@@ -96,13 +96,13 @@ public class CodiceController {
                 for (Map<String, String> risultato : risultatiTest) {
                     String testName = risultato.get("test");
 
-                    // Pulisci il nome del test rimuovendo tag HTML e spazi
+                    // Tolgo dal nome del test tutto cio che viene aggiunto da html
                     testName = testName.replaceAll("<[^>]*>", "").replaceAll("\\s+", "");
 
-                    // Estrai solo il nome del metodo di test
+                    // inizializzo la variabile con dentro il solo nome del test
                     String testMethodName = testName.replaceAll(".*\\btest([a-zA-Z0-9]+).*", "test$1");
 
-                    // Genera un ID univoco basato sul nome del metodo di test
+                    // creo un'ancora con dentro il nome del test
                     String testId = "test_" + testMethodName;
 
                     outputMessaggio
@@ -110,7 +110,7 @@ public class CodiceController {
                             .append("<a href='#" + testId + "' hx-get='/mostraTest?idDomanda=" + idDomanda
                                     + "&highlight=" + testId
                                     + "' hx-target='#test-unita' hx-swap='innerHTML'>")
-                            .append(testId) // Usa il nome del link con lo stesso formato dell'ID
+                            .append(testId) 
                             .append("</a><br><b>Errore:</b> ")
                             .append(risultato.get("errore"))
                             .append("</li>");
@@ -140,16 +140,16 @@ public class CodiceController {
             if (test == null || test.isEmpty()) {
                 return ResponseEntity.status(400).body("Nessun test disponibile");
             } else {
-                // Aggiungi ID univoci solo alle classi che contengono "public void test" nel
-                // nome
+                
                 String[] testLines = test.split("\n");
                 StringBuilder testWithIds = new StringBuilder();
 
                 for (String line : testLines) {
+                    // verifico che nella linea ci sia public void test che e' la dichiarazione obbligatoria
                     if (line.toLowerCase().contains("public void test")) {
-                        // Estrai il nome del metodo di test dalla linea
+                        
                         String testMethodName = line.substring(line.indexOf("test"), line.indexOf("(")).trim();
-                        // Genera un ID univoco basato sul nome del metodo
+                        
                         String testId = "test_" + testMethodName.replaceAll("[^a-zA-Z0-9]", "_");
 
                         if (testId.equals(highlight)) {
@@ -194,6 +194,9 @@ public class CodiceController {
         }
     }
 
-    
 
+   
+    
+    
+    
 }
