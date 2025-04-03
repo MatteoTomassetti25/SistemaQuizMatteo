@@ -195,7 +195,17 @@ public class CodiceController {
     }
 
 
-   
+    @GetMapping("/handle-error")
+    public ResponseEntity<String> handleError(@RequestParam int lineNumber) {
+        // Implementazione come sopra
+        return ResponseEntity.ok().build();
+    }
+    
+    @GetMapping("/clear-error")
+    public ResponseEntity<String> clearError() {
+        // Implementazione come sopra
+        return ResponseEntity.ok().build();
+    }
     
     
     

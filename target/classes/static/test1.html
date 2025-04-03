@@ -4,12 +4,10 @@
 <head>
     <title>Esegui Test</title>
     <meta charset="UTF-8">
-    <meta name="htmx-config" content='{"responseHandling": [{"code":".*", "swap": true}]}' />
+    <meta name="htmx-config" content='{"responseHandling": [{"code":".*", "swap": true}]}'>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js" type="text/javascript"
-        charset="utf-8"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js" type="text/javascript"
-        charset="utf-8"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js" type="text/javascript" charset="utf-8"></script>
 
     <style>
         body {
@@ -61,7 +59,7 @@
             transition: border-color 0.3s ease;
         }
 
-        #editor {
+        #editor, #testEditor {
             width: 78%;
             height: 300px;
             margin-left: 70px;
@@ -150,13 +148,17 @@
             color: red;
             font-weight: bold;
         }
-
-       
+        
+        
+        
+        /* Nascondi gli elementi che contengono dati per HTMX */
+        .htmx-data {
+            display: none;
+        }
     </style>
 </head>
 
 <body>
-
     <h1>Esegui Test</h1>
 
     <div class="form-container">
@@ -168,8 +170,8 @@
                 <input type="number" id="idDomanda" name="idDomanda" required hx-trigger="input"
                     hx-include="[name='idDomanda']">
 
-                <div hx-get="/mostraTest" hx-target="#test-unita" hx-trigger="input from:#idDomanda"
-                    hx-include="#idDomanda"></div>
+                <div hx-get="/mostraTest" hx-target="#testEditor" hx-trigger="input from:#idDomanda"
+                    hx-include="#idDomanda" hx-swap="none"></div>
                 <div hx-get="/mostraDomanda" hx-target="#consegna-domanda" hx-trigger="input from:#idDomanda"
                     hx-include="#idDomanda"></div>
             </div>
@@ -178,12 +180,13 @@
                 Consegna Domanda
             </div>
 
-            <div id="risultato"></div>
+            <div id="risultato" 
+                 hx-on:htmx:after-swap="initErrorLinks()"></div>
 
             <div>
                 <label for="codice">Codice:</label>
                 <div id="editor"></div>
-                <input type="hidden" name="codice" id="codiceInput" />
+                <input type="hidden" name="codice" id="codiceInput">
             </div>
 
             <div>
@@ -192,12 +195,47 @@
 
         </form>
 
-        <div id="test-unita" class="test-unita">
-            Test Domanda
+        <div>
+            <label for="testEditor">Test Domanda:</label>
+            <div id="testEditor"></div>
+            <div id="testContent" style="display:none;"></div>
         </div>
+        
+        <!-- Elemento per memorizzare temporaneamente i dati per HTMX -->
+        <div id="htmx-data" class="htmx-data">
+            <div id="error-line-data" hx-swap-oob="true"></div>
+            <div id="test-line-data" hx-swap-oob="true"></div>
+        </div>
+        
+        <!-- Endpoint HTMX per gestire il click sui link di errore nel primo editor -->
+        <div id="error-handler" 
+             hx-get="/handle-error" 
+             hx-trigger="error-click from:body" 
+             hx-swap="none"
+             hx-vals='js:{"lineNumber": window.lastErrorLine}'></div>
+             
+        <!-- Endpoint HTMX per rimuovere i marker di errore nel primo editor -->
+        <div id="clear-error-handler" 
+             hx-get="/clear-error" 
+             hx-trigger="error-clear from:body" 
+             hx-swap="none"></div>
+             
+        <!-- Endpoint HTMX per gestire il click sui link di test nel secondo editor -->
+        <div id="test-handler" 
+             hx-get="/handle-test" 
+             hx-trigger="test-click from:body" 
+             hx-swap="none"
+             hx-vals='js:{"testId": window.lastTestId}'></div>
+             
+        <!-- Endpoint HTMX per rimuovere i marker di test nel secondo editor -->
+        <div id="clear-test-handler" 
+             hx-get="/clear-test" 
+             hx-trigger="test-clear from:body" 
+             hx-swap="none"></div>
     </div>
 
     <script>
+        // Configurazione dell'editor Ace
         var editor = ace.edit("editor");
         editor.setTheme("ace/theme/eclipse");
         editor.session.setMode("ace/mode/java");
@@ -207,10 +245,374 @@
             enableSnippets: true,
             enableLiveAutocompletion: true
         });
-
-
-
+        
+        var testEditor = ace.edit("testEditor");
+        testEditor.setTheme("ace/theme/eclipse");
+        testEditor.session.setMode("ace/mode/java");
+        testEditor.setReadOnly(true);
+        
+        // Variabili globali necessarie per l'interazione con HTMX
+        window.errorMarkers = [];
+        window.testMarkers = [];
+        window.lastErrorLine = -1;
+        window.lastLineContent = "";
+        window.lastTestId = "";
+        window.testIdToLineMap = {}; // Mappa per memorizzare la corrispondenza tra ID test e righe
+        window.testsLoaded = false; // Flag per verificare se i test sono stati caricati
+        
+        // Funzione per inizializzare i link di errore dopo che il risultato è stato aggiornato
+        function initErrorLinks() {
+            // Imposta il flag testsLoaded a true quando vengono caricati i test
+            window.testsLoaded = true;
+            
+            // Gestione dei link per il primo editor (errori di compilazione)
+            document.querySelectorAll('a[href^="#line"]').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const href = this.getAttribute('href');
+                    const lineNumber = parseInt(href.substring(5));
+                    
+                    if (!isNaN(lineNumber)) {
+                        // Memorizza il numero di riga per l'evento HTMX
+                        window.lastErrorLine = lineNumber;
+                        
+                        // Memorizza il contenuto della riga per il controllo delle modifiche
+                        if (lineNumber > 0 && lineNumber <= editor.session.getLength()) {
+                            window.lastLineContent = editor.session.getLine(lineNumber - 1);
+                        }
+                        
+                        // Trigger dell'evento HTMX per gestire l'errore
+                        htmx.trigger('#error-handler', 'error-click');
+                    }
+                });
+            });
+            
+            // Gestione dei link per il secondo editor (test falliti)
+            document.querySelectorAll('a[href^="#test_"]').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const href = this.getAttribute('href');
+                    const testId = href.substring(1); // Rimuovi il # iniziale
+                    
+                    // Memorizza l'ID del test per l'evento HTMX
+                    window.lastTestId = testId;
+                    
+                    // Memorizza il testo del link per la ricerca nel secondo editor
+                    const testText = this.textContent.trim();
+                    
+                    // Cerca la riga corrispondente nel secondo editor
+                    findTestLineInEditor(testId, testText);
+                    
+                    // Trigger dell'evento HTMX per gestire il test
+                    htmx.trigger('#test-handler', 'test-click');
+                });
+            });
+        }
+        
+        // Funzione per trovare la riga corrispondente al test nel secondo editor
+        function findTestLineInEditor(testId, testText) {
+            // Se abbiamo già trovato questa riga in precedenza, usiamo il valore memorizzato
+            if (window.testIdToLineMap[testId]) {
+                return;
+            }
+            
+            // Cerca il nome del test nel contenuto del secondo editor
+            const lines = testEditor.session.getDocument().getAllLines();
+            
+            // Prima cerca il nome esatto del test
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes(testId.replace('test_', '')) || 
+                    lines[i].includes(testText)) {
+                    window.testIdToLineMap[testId] = i + 1;
+                    return;
+                }
+            }
+            
+            // Se non lo trova, cerca qualsiasi riga che contenga "test" e parte del nome del test
+            const testName = testId.replace('test_', '');
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('test') && 
+                    (lines[i].includes(testName.substring(0, 5)) || 
+                     testName.includes(lines[i].substring(0, 5)))) {
+                    window.testIdToLineMap[testId] = i + 1;
+                    return;
+                }
+            }
+            
+            // Se ancora non lo trova, usa la prima riga che contiene "test"
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('test')) {
+                    window.testIdToLineMap[testId] = i + 1;
+                    return;
+                }
+            }
+            
+            // Se non trova nulla, usa la prima riga
+            window.testIdToLineMap[testId] = 1;
+        }
+        
+        // Funzione per gestire il marker di errore nel primo editor (chiamata da HTMX)
+        function markError(lineNumber) {
+            // Rimuovi i marker esistenti
+            clearErrorMarkers();
+            
+            // Memorizza l'ultima riga con errore
+            window.lastErrorLine = lineNumber;
+            
+            // Sposta lo scorrimento all'interno dell'editor alla riga specificata
+            editor.scrollToLine(lineNumber - 1, true, true, function() {});
+            editor.gotoLine(lineNumber, 0, true);
+            
+            // Ottieni le coordinate della riga nell'editor
+            const lineHeight = editor.renderer.lineHeight;
+            const firstRow = editor.renderer.getFirstVisibleRow();
+            const y = (lineNumber - 1 - firstRow) * lineHeight;
+            
+            // Crea un elemento div per il marker di errore (quadrato rosso con X bianca)
+            const marker = document.createElement('div');
+            marker.className = 'ace_error-marker';
+            marker.setAttribute('data-line', lineNumber);
+            marker.style.top = y + 'px';
+            marker.style.left = '5px';
+            
+            // Aggiungi il marker al container dell'editor
+            const editorContainer = editor.container;
+            editorContainer.appendChild(marker);
+            
+            // Aggiungi il marker all'array per poterlo rimuovere in seguito
+            window.errorMarkers.push(marker);
+            
+            // Seleziona la riga per evidenziarla
+            editor.selection.setSelectionRange(new ace.Range(lineNumber - 1, 0, lineNumber - 1, editor.session.getLine(lineNumber - 1).length));
+            
+            // Rimuovi eventuali listener precedenti per evitare duplicati
+            editor.session.off('changeScrollTop', updateErrorMarkerPosition);
+            
+            // Aggiorna la posizione del marker quando l'editor viene scrollato
+            editor.session.on('changeScrollTop', updateErrorMarkerPosition);
+        }
+        
+        // Funzione per gestire il marker di test nel secondo editor (chiamata da HTMX)
+        function markTest(testId) {
+            // Non mostrare la X se i test non sono stati caricati
+            if (!window.testsLoaded) {
+                return;
+            }
+            
+            // Rimuovi i marker esistenti
+            clearTestMarkers();
+            
+            // Memorizza l'ultimo ID di test
+            window.lastTestId = testId;
+            
+            // Trova la riga corrispondente nel testEditor
+            let lineNumber = window.testIdToLineMap[testId];
+            
+            if (!lineNumber) {
+                // Se non abbiamo trovato la riga in precedenza, cerchiamola ora
+                const testElement = document.getElementById(testId);
+                if (testElement) {
+                    findTestLineInEditor(testId, testElement.textContent.trim());
+                    lineNumber = window.testIdToLineMap[testId];
+                } else {
+                    // Se non troviamo l'elemento, usiamo la prima riga
+                    lineNumber = 1;
+                }
+            }
+            
+            if (lineNumber > 0) {
+                // Sposta lo scorrimento all'interno dell'editor alla riga specificata
+                testEditor.scrollToLine(lineNumber - 1, true, true, function() {
+                    // Dopo che lo scrolling è completato, posiziona il cursore sulla riga
+                    testEditor.gotoLine(lineNumber, 0, true);
+                    
+                    // Ottieni le coordinate della riga nell'editor
+                    const lineHeight = testEditor.renderer.lineHeight;
+                    const firstRow = testEditor.renderer.getFirstVisibleRow();
+                    const y = (lineNumber - 1 - firstRow) * lineHeight;
+                    
+                    // Crea un elemento div per il marker di test (quadrato rosso con X bianca)
+                    const marker = document.createElement('div');
+                    marker.className = 'ace_test-marker';
+                    marker.setAttribute('data-line', lineNumber);
+                    marker.style.top = y + 'px';
+                    marker.style.left = '5px';
+                    
+                    // Aggiungi il marker al container dell'editor
+                    const editorContainer = testEditor.container;
+                    editorContainer.appendChild(marker);
+                    
+                    // Aggiungi il marker all'array per poterlo rimuovere in seguito
+                    window.testMarkers.push(marker);
+                    
+                    // Seleziona la riga per evidenziarla
+                    testEditor.selection.setSelectionRange(new ace.Range(lineNumber - 1, 0, lineNumber - 1, testEditor.session.getLine(lineNumber - 1).length));
+                    
+                    // Rimuovi eventuali listener precedenti per evitare duplicati
+                    testEditor.session.off('changeScrollTop', updateTestMarkerPosition);
+                    
+                    // Aggiorna la posizione del marker quando l'editor viene scrollato
+                    testEditor.session.on('changeScrollTop', updateTestMarkerPosition);
+                });
+            }
+        }
+        
+        // Funzione per aggiornare la posizione dei marker di errore quando il primo editor viene scrollato
+        function updateErrorMarkerPosition() {
+            window.errorMarkers.forEach(function(marker) {
+                if (marker && marker.parentNode) {
+                    const lineNumber = parseInt(marker.getAttribute('data-line'));
+                    if (!isNaN(lineNumber)) {
+                        const lineHeight = editor.renderer.lineHeight;
+                        const firstRow = editor.renderer.getFirstVisibleRow();
+                        const y = (lineNumber - 1 - firstRow) * lineHeight;
+                        marker.style.top = y + 'px';
+                    }
+                }
+            });
+        }
+        
+        // Funzione per aggiornare la posizione dei marker di test quando il secondo editor viene scrollato
+        function updateTestMarkerPosition() {
+            window.testMarkers.forEach(function(marker) {
+                if (marker && marker.parentNode) {
+                    const lineNumber = parseInt(marker.getAttribute('data-line'));
+                    if (!isNaN(lineNumber)) {
+                        const lineHeight = testEditor.renderer.lineHeight;
+                        const firstRow = testEditor.renderer.getFirstVisibleRow();
+                        const y = (lineNumber - 1 - firstRow) * lineHeight;
+                        marker.style.top = y + 'px';
+                    }
+                }
+            });
+        }
+        
+        // Funzione per rimuovere tutti i marker di errore nel primo editor
+        function clearErrorMarkers() {
+            window.errorMarkers.forEach(function(marker) {
+                if (marker && marker.parentNode) {
+                    marker.parentNode.removeChild(marker);
+                }
+            });
+            window.errorMarkers = [];
+            
+            // Rimuovi anche il listener per evitare problemi
+            editor.session.off('changeScrollTop', updateErrorMarkerPosition);
+        }
+        
+        // Funzione per rimuovere tutti i marker di test nel secondo editor
+        function clearTestMarkers() {
+            window.testMarkers.forEach(function(marker) {
+                if (marker && marker.parentNode) {
+                    marker.parentNode.removeChild(marker);
+                }
+            });
+            window.testMarkers = [];
+            
+            // Rimuovi anche il listener per evitare problemi
+            testEditor.session.off('changeScrollTop', updateTestMarkerPosition);
+        }
+        
+        // Configura HTMX per aggiornare l'editor ACE
+        htmx.on("htmx:afterRequest", function(evt) {
+            if (evt.detail.requestConfig.path === "/mostraTest" && evt.detail.successful) {
+                testEditor.setValue(evt.detail.xhr.responseText, -1);
+                // Resetta la mappa di corrispondenza tra ID test e righe
+                window.testIdToLineMap = {};
+                // Resetta il flag testsLoaded quando vengono caricati nuovi test
+                window.testsLoaded = false;
+                // Rimuovi i marker esistenti
+                clearTestMarkers();
+            }
+            
+            // Gestione degli endpoint HTMX personalizzati per il primo editor
+            if (evt.detail.requestConfig.path === "/handle-error" && evt.detail.successful) {
+                markError(window.lastErrorLine);
+            }
+            
+            if (evt.detail.requestConfig.path === "/clear-error" && evt.detail.successful) {
+                clearErrorMarkers();
+                window.lastErrorLine = -1;
+            }
+            
+            // Gestione degli endpoint HTMX personalizzati per il secondo editor
+            if (evt.detail.requestConfig.path === "/handle-test" && evt.detail.successful) {
+                markTest(window.lastTestId);
+            }
+            
+            if (evt.detail.requestConfig.path === "/clear-test" && evt.detail.successful) {
+                clearTestMarkers();
+                window.lastTestId = "";
+            }
+        });
+        
+        // Rileva le modifiche nel primo editor e rimuovi i marker in entrambi gli editor
+        editor.session.on('change', function() {
+            // Rimuovi i marker nel primo editor se la riga è stata modificata
+            if (window.lastErrorLine > 0) {
+                const currentLineContent = editor.session.getLine(window.lastErrorLine - 1);
+                
+                if (currentLineContent !== window.lastLineContent) {
+                    // Trigger dell'evento HTMX per rimuovere i marker nel primo editor
+                    htmx.trigger('#clear-error-handler', 'error-clear');
+                    
+                    // Rimuovi anche i marker nel secondo editor quando l'input del primo editor cambia
+                    htmx.trigger('#clear-test-handler', 'test-clear');
+                }
+            } else {
+                // Se non c'è una riga di errore specifica, rimuovi comunque i marker nel secondo editor
+                // quando l'input del primo editor cambia
+                htmx.trigger('#clear-test-handler', 'test-clear');
+            }
+        });
+        
+        // Gestione dell'hash nella URL per evidenziare la riga corrispondente
+        function handleHashLinks() {
+            const hash = window.location.hash;
+            
+            if (hash && hash.match(/^#line\d+$/)) {
+                const lineNumber = parseInt(hash.substring(5));
+                
+                if (!isNaN(lineNumber)) {
+                    window.lastErrorLine = lineNumber;
+                    
+                    if (lineNumber > 0 && lineNumber <= editor.session.getLength()) {
+                        window.lastLineContent = editor.session.getLine(lineNumber - 1);
+                    }
+                    
+                    htmx.trigger('#error-handler', 'error-click');
+                }
+            } else if (hash && hash.match(/^#test_/)) {
+                const testId = hash.substring(1); // Rimuovi il # iniziale
+                
+                window.lastTestId = testId;
+                
+                // Cerca la riga corrispondente nel secondo editor
+                const testElement = document.getElementById(testId);
+                if (testElement) {
+                    findTestLineInEditor(testId, testElement.textContent.trim());
+                }
+                
+                // Non mostrare la X se i test non sono stati caricati
+                if (window.testsLoaded) {
+                    htmx.trigger('#test-handler', 'test-click');
+                }
+            }
+        }
+        
+        // Esegui handleHashLinks quando la pagina viene caricata
+        window.addEventListener('load', handleHashLinks);
+        
+        // Esegui handleHashLinks quando l'hash nella URL cambia
+        window.addEventListener('hashchange', handleHashLinks);
+        
+        // Aggiungi listener per gli eventi di resize dell'editor
+        editor.renderer.on('resize', updateErrorMarkerPosition);
+        testEditor.renderer.on('resize', updateTestMarkerPosition);
+        
+        // Aggiungi listener per gli eventi di cambio tema dell'editor
+        editor.renderer.on('themeChange', updateErrorMarkerPosition);
+        testEditor.renderer.on('themeChange', updateTestMarkerPosition);
     </script>
 </body>
-
 </html>
