@@ -163,7 +163,7 @@
 
     <div class="form-container">
         <form id="testForm" hx-post="/eseguiTest" hx-target="#risultato" hx-swap="innerHTML" hx-trigger="submit"
-            hx-vals='js:{ codice: editor.getValue() }'  hx-on:htmx:after-request="editor.removeMarker();">
+            hx-vals='js:{ codice: editor.getValue() }' hx-on:htmx:after-request="clearErrorMarkers()" >
 
             <div>
                 <label for="idDomanda">ID Domanda:</label>
@@ -228,6 +228,20 @@
             
           
         });
+
+
+        function clearErrorMarkers() {
+            // Rimuovi marker e annotazioni dall'editor principale
+            editor.session.clearAnnotations();
+                editor.session.removeMarker(window.aceMarker);
+    
+            // Rimuovi marker e annotazioni dall'editor dei test
+            testEditor.session.clearAnnotations();
+                testEditor.session.removeMarker(window.testAceMarker);
+
+        }
+    
+
 
     </script>
     

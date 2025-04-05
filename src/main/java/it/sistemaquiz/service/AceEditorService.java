@@ -250,69 +250,7 @@ public String clearErrorMarkers() {
     return script.toString();
 }
 
-public String createErrorMarker(int lineNumber, String editorId) {
-    return String.format(
-        "%s.session.clearAnnotations(); " +
-        "if (window.aceMarker) %s.session.removeMarker(window.aceMarker); " +
-        "var Range = ace.require('ace/range').Range; " +
-        "window.aceMarker = %s.session.addMarker( " +
-        "   new Range(%d, 0, %d, Infinity), " +
-        "   'ace_error-line', " +
-        "   'fullLine' " +
-        "); " +
-        "%s.session.setAnnotations([{ " +
-        "   row: %d, column: 0, text: 'Errore qui', type: 'error' " +
-        "}]); " +
-        "%s.gotoLine(%d, 0, true); " +
-        "%s.scrollToLine(%d, true, true);",
-        editorId, editorId, editorId, 
-        lineNumber-1, lineNumber-1,
-        editorId,
-        lineNumber-1,
-        editorId, lineNumber,
-        editorId, lineNumber-1
-    );
-}
 
-
-public String createErrorMarker(String highlight) {
-    StringBuilder script = new StringBuilder();
-    
-    // 1. Prima puliamo eventuali marker esistenti
-    script.append(clearErrorMarkers());
-    
-    // 2. Troviamo la riga corrispondente all'elemento da evidenziare
-    script.append("var targetElement = document.querySelector('").append(highlight).append("');");
-    script.append("if (targetElement) {");
-    script.append("  var lineNumber = parseInt(targetElement.getAttribute('data-line')) || 1;");
-    
-    // 3. Aggiungiamo l'annotazione (segnalibro rosso a sinistra)
-    script.append("  editor.session.setAnnotations([{");
-    script.append("    row: lineNumber - 1,");
-    script.append("    column: 0,");
-    script.append("    text: 'Errore qui',");
-    script.append("    type: 'error'");
-    script.append("  }]);");
-    
-    // 4. Aggiungiamo un marker rosso nella gutter (area numeri di riga)
-    script.append("  var Range = ace.require('ace/range').Range;");
-    script.append("  var markerId = editor.session.addMarker(");
-    script.append("    new Range(lineNumber - 1, 0, lineNumber - 1, Infinity),");
-    script.append("    'ace_error-line',");
-    script.append("    'fullLine'");
-    script.append("  );");
-    
-    // 5. Memorizziamo l'ID del marker per poterlo rimuovere dopo
-    script.append("  if (!window.aceMarkers) window.aceMarkers = [];");
-    script.append("  window.aceMarkers.push(markerId);");
-    
-    // 6. Spostiamo il cursore e scrolliamo alla riga interessata
-    script.append("  editor.gotoLine(lineNumber, 0, true);");
-    script.append("  editor.scrollToLine(lineNumber - 1, true, true);");
-    script.append("}");
-    
-    return script.toString();
-}
 
 
 public String createErrorMarkerScript(String editorVar, Object lineNumber, String message) {

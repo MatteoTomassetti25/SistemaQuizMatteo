@@ -206,12 +206,6 @@ public ResponseEntity<?> eseguiTest(@RequestParam Long idDomanda, @RequestParam 
     }
 
 
-    @PostMapping("/rimuoviErrori")
-    public ResponseEntity<String> rimuoviErrori(@RequestBody String entity) {
-        
-        aceEditorService.clearErrorMarkers();
-        
-        return ResponseEntity.ok("Errori eliminati");
-    }
+    
     
 }
