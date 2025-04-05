@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -28,8 +29,11 @@ import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import org.junit.platform.launcher.listeners.TestExecutionSummary.Failure;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import it.sistemaquiz.entity.Domanda;
 import it.sistemaquiz.model.JSONResponse;
 
 @Service
@@ -132,16 +136,31 @@ public class CodiceService {
 
         if (!riuscita) {
             StringBuilder messaggioErrore = new StringBuilder("<div>Errore di compilazione:<ul>");
+
             for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostica.getDiagnostics()) {
-                messaggioErrore.append("<li><a href='#line")
-                        .append(diagnostic.getLineNumber())
-                        .append("'>Errore alla riga ")
-                        .append(diagnostic.getLineNumber())
-                        .append("</a>: ")
-                        .append(diagnostic.getMessage(null))
+                int lineNumber = (int) diagnostic.getLineNumber(); // Estrai il numero di riga
+                String errorMessage = diagnostic.getMessage(null); // Estrai il messaggio di errore
+            
+                // Genera un ID univoco per ogni errore
+                String errorId = "error_line_" + lineNumber;
+            
+                // Costruisci il messaggio di errore con la nuova logica
+                messaggioErrore.append("<li>")
+                        .append("<a href='#' onclick='highlightErrorInEditor(")
+                        .append(lineNumber)
+                        .append("); return false;' ")
+                        .append("data-errorid='").append(errorId).append("'>")
+                        .append(errorId)
+                        .append("</a><br><b>Errore:</b> ")
+                        .append(errorMessage)
                         .append("</li>");
             }
+            
             messaggioErrore.append("</ul></div>");
+            
+           AceEditorService aceEditorService = new AceEditorService();
+            // Utilizzo del servizio AceEditorService per generare lo script
+            messaggioErrore.append(aceEditorService.createTestErrorHandlingScript());
 
             throw new IllegalStateException(messaggioErrore.toString());
 
@@ -263,6 +282,9 @@ public class CodiceService {
     }
 
    
+    
+
+
     
 
 }
