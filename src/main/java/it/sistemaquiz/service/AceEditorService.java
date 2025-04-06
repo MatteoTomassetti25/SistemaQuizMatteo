@@ -116,25 +116,13 @@ private String escapeJs(String input) {
 }
 
 
-public String createHighlightErrorScript(int lineNumber) {
-    return String.format(
-        "document.addEventListener('DOMContentLoaded', function() {" +
-        "   const editor = ace.edit('editor');" +
-        "   %s" +
-        "   %s" +
-        "   editor.scrollToLine(%d, true, true);" +
-        "});",
-        createErrorMarkerScript("editor", lineNumber, "Errore di compilazione"),
-        createHighlightLineScript("editor", lineNumber, "error-line"),
-        lineNumber
-    );
-}
+
 
 
 public String createHighlightErrorInEditorFunction() {
     return "function highlightErrorInEditor(lineNumber) {\n" +
            "    const editor = ace.edit('editor');\n" +
-           "    " + createErrorMarkerScript("editor", "lineNumber", "Errore di test") + "\n" +
+           "    " + createErrorMarkerScript("editor", "lineNumber", "Errore di compilazione") + "\n" +
            "    " + createHighlightLineScript("editor", "lineNumber", "error-line") + "\n" +
            "    editor.scrollToLine(lineNumber, true, true);\n" +
            "    editor.gotoLine(lineNumber, 0, 0, true);\n" +
@@ -145,16 +133,27 @@ public String createHighlightErrorInEditorFunction() {
 public String createFindTestLineFunction() {
     return "function findTestLine(testId) {\n" +
            "    const testContent = ace.edit('testEditor').getValue();\n" +
-           "    const testRegex = new RegExp('\\\\b' + testId + '\\\\b');\n" +
            "    const lines = testContent.split('\\n');\n" +
+           "    let startLine = -1;\n" +
+           "    const testRegex = new RegExp('\\\\b' + testId + '\\\\b\\\\s*\\\\(\\\\)');\n" +
            "    for (let i = 0; i < lines.length; i++) {\n" +
            "        if (testRegex.test(lines[i])) {\n" +
-           "            return i + 1;\n" +
+           "            startLine = i;\n" +
+           "            break;\n" +
            "        }\n" +
+           "    }\n" +
+           "    if (startLine !== -1) {\n" +
+           "        for (let j = startLine + 1; j < lines.length; j++) {\n" +
+           "            if (/assertEquals\\s*\\(/.test(lines[j])) {\n" +
+           "                return j + 1;\n" + // line numbers are 1-based
+           "            }\n" +
+           "        }\n" +
+           "        return startLine + 1;\n" +
            "    }\n" +
            "    return 1;\n" +
            "}";
 }
+
 
 //click link errori
 public String createTestClickHandlerScript() {
