@@ -1,7 +1,5 @@
 package it.sistemaquiz.service;
 
-
-
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.net.URI;
@@ -10,6 +8,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -137,12 +137,17 @@ public class CodiceService {
         if (!riuscita) {
             StringBuilder messaggioErrore = new StringBuilder("<div>Errore di compilazione:<ul>");
 
+            Map<String, Integer> erroriCompilazione = new HashMap<>();
+
             for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostica.getDiagnostics()) {
                 int lineNumber = (int) diagnostic.getLineNumber(); // Estrai il numero di riga
                 String errorMessage = diagnostic.getMessage(null); // Estrai il messaggio di errore
             
                 // Genera un ID univoco per ogni errore
                 String errorId = "error_line_" + lineNumber;
+                
+                // Salva il numero di riga per l'errore
+                erroriCompilazione.put(errorId, lineNumber);
             
                 // Costruisci il messaggio di errore con la nuova logica
                 messaggioErrore.append("<li>")
@@ -158,12 +163,14 @@ public class CodiceService {
             
             messaggioErrore.append("</ul></div>");
             
-           AceEditorService aceEditorService = new AceEditorService();
+            AceEditorService aceEditorService = new AceEditorService();
             // Utilizzo del servizio AceEditorService per generare lo script
             messaggioErrore.append(aceEditorService.createTestErrorHandlingScript());
 
-            throw new IllegalStateException(messaggioErrore.toString());
-
+            // Aggiungi i numeri di riga degli errori al messaggio di eccezione
+            IllegalStateException exception = new IllegalStateException(messaggioErrore.toString());
+            exception.addSuppressed(new RuntimeException("ERRORI_COMPILAZIONE:" + erroriCompilazione.toString()));
+            throw exception;
         }
 
         Map<String, byte[]> classBytes = gestoreCompilazioneInMemoria.getBytes();
@@ -193,12 +200,19 @@ public class CodiceService {
 
         for (Failure i : summary.getFailures()) {
             Map<String, String> risultato = new HashMap<>();
+            String errorMessage = i.getException().getMessage();
+            
+            // Estrazione del numero di riga direttamente qui
+            int lineNumber = extractLineNumberFromError(errorMessage);
 
             // Nome del test in una riga separata
             risultato.put("test", " <b></b> " + i.getTestIdentifier().getDisplayName() + "<br>");
 
             // Messaggio di errore con rientro e nuova riga
-            risultato.put("errore", " <i></i> " + i.getException().getMessage() + "<br><br>");
+            risultato.put("errore", " <i></i> " + errorMessage + "<br><br>");
+            
+            // Aggiungi il numero di riga al risultato
+            risultato.put("lineNumber", String.valueOf(lineNumber));
 
             risultatiTest.add(risultato);
         }
@@ -207,6 +221,21 @@ public class CodiceService {
             this.output = true;
 
         return risultatiTest;
+    }
+    
+    // Metodo di estrazione per i test JUnit
+    private int extractLineNumberFromError(String errorMessage) {
+        if (errorMessage == null) return 0;
+        Pattern pattern = Pattern.compile("(?:alla riga|:)(\\d+)");
+        Matcher matcher = pattern.matcher(errorMessage);
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+        return 0;
     }
 
     class CodiceUtenteStringa extends SimpleJavaFileObject {
@@ -280,11 +309,4 @@ public class CodiceService {
             return defineClass(name, bytes, 0, bytes.length);
         }
     }
-
-   
-    
-
-
-    
-
 }

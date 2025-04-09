@@ -155,7 +155,7 @@ public String createFindTestLineFunction() {
 }
 
 
-//click link errori
+//click link errori con scorrimento della pagina verso il secondo editor
 public String createTestClickHandlerScript() {
     return "document.addEventListener('click', function(e) {\n" +
            "    if (e.target.matches('a[data-testid]')) {\n" +
@@ -166,6 +166,13 @@ public String createTestClickHandlerScript() {
            "        " + createHighlightLineScript("testEditor", "lineNumber", "error-line") + "\n" +
            "        testEditor.scrollToLine(lineNumber, true, true);\n" +
            "        testEditor.gotoLine(lineNumber, 0, 0, true);\n" +
+           "        \n" +
+           "        // Scorrimento della pagina per mostrare il secondo editor\n" +
+           "        const testEditorElement = document.getElementById('testEditor');\n" +
+           "        if (testEditorElement) {\n" +
+           "            // Scorrimento fluido verso l'elemento testEditor\n" +
+           "            testEditorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });\n" +
+           "        }\n" +
            "    }\n" +
            "});";
 }
@@ -188,5 +195,4 @@ public String createTestHighlightScript(int highlightLine) {
            "});" +
            "</script>";
 }
-
 }

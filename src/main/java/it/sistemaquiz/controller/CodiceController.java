@@ -62,7 +62,7 @@ public ResponseEntity<?> eseguiTest(@RequestParam Long idDomanda, @RequestParam 
     
 
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    String matricola = "123456"; // TODO: prendi dalla sessione se necessario
+    String matricola = "123456"; 
 
     Utente utente = utenteRepository.findByMatricola(matricola)
             .orElseThrow(() -> new RuntimeException("Utente non trovato"));
@@ -105,7 +105,8 @@ public ResponseEntity<?> eseguiTest(@RequestParam Long idDomanda, @RequestParam 
             for (Map<String, String> risultato : risultatiTest) {
                 String testName = risultato.get("test");
                 String errore = risultato.get("errore");
-                int lineNumber = extractLineNumberFromError(errore);
+                // Usa direttamente il numero di riga fornito dal service
+                int lineNumber = Integer.parseInt(risultato.get("lineNumber"));
 
                 testName = testName.replaceAll("<[^>]*>", "").replaceAll("\\s+", "");
                 String testMethodName = testName.replaceAll(".*\\btest([a-zA-Z0-9_]+).*", "test$1");
@@ -129,11 +130,40 @@ public ResponseEntity<?> eseguiTest(@RequestParam Long idDomanda, @RequestParam 
         }
 
     } catch (Exception e) {
-        int lineNumber = extractLineNumberFromError(e.getMessage());
-
+        // Estrai i numeri di riga degli errori di compilazione direttamente dall'eccezione
         String errorMessage = "<div class='errore'>Errore: " + e.getMessage() + "</div>";
-
-        if (lineNumber > 0) {
+        
+        // Cerca informazioni sugli errori di compilazione nelle eccezioni soppresse
+        Map<String, Integer> erroriCompilazione = new HashMap<>();
+        for (Throwable suppressed : e.getSuppressed()) {
+            String message = suppressed.getMessage();
+            if (message != null && message.startsWith("ERRORI_COMPILAZIONE:")) {
+                try {
+                    // Estrai la mappa degli errori dal messaggio
+                    String mapString = message.substring("ERRORI_COMPILAZIONE:".length());
+                    // Parsing semplificato della mappa
+                    mapString = mapString.substring(1, mapString.length() - 1); // Rimuovi { }
+                    String[] entries = mapString.split(", ");
+                    for (String entry : entries) {
+                        String[] keyValue = entry.split("=");
+                        if (keyValue.length == 2) {
+                            String key = keyValue[0];
+                            int value = Integer.parseInt(keyValue[1]);
+                            erroriCompilazione.put(key, value);
+                        }
+                    }
+                } catch (Exception ex) {
+                    // Ignora errori di parsing
+                }
+                break;
+            }
+        }
+        
+        // Se abbiamo trovato errori di compilazione, aggiungi lo script per evidenziare la prima riga con errore
+        if (!erroriCompilazione.isEmpty()) {
+            // Prendi il primo errore per evidenziarlo
+            int lineNumber = erroriCompilazione.values().iterator().next();
+            
             errorMessage += "<script>" +
                 "document.addEventListener('DOMContentLoaded', function() {" +
                 "   const editor = ace.edit('editor');" +
@@ -147,21 +177,6 @@ public ResponseEntity<?> eseguiTest(@RequestParam Long idDomanda, @RequestParam 
         return ResponseEntity.badRequest().body(errorMessage);
     }
 }
-
-
-    private int extractLineNumberFromError(String errorMessage) {
-        if (errorMessage == null) return 0;
-        Pattern pattern = Pattern.compile("(?:alla riga|:)(\\d+)");
-        Matcher matcher = pattern.matcher(errorMessage);
-        if (matcher.find()) {
-            try {
-                return Integer.parseInt(matcher.group(1));
-            } catch (NumberFormatException e) {
-                return 0;
-            }
-        }
-        return 0;
-    }
 
     @GetMapping("/mostraTest")
     public ResponseEntity<String> mostraTest(@RequestParam Long idDomanda,
@@ -204,8 +219,4 @@ public ResponseEntity<?> eseguiTest(@RequestParam Long idDomanda, @RequestParam 
         }
         return ResponseEntity.status(404).body("Domanda non trovata");
     }
-
-
-    
-    
 }
