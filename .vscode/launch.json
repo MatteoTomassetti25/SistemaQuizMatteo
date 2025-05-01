@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-SistemaQuizApplication<SistemaQuiz>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "it.sistemaquiz.SistemaQuizApplication",
+            "projectName": "SistemaQuiz",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
