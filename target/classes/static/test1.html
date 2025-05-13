@@ -6,252 +6,364 @@
     <meta charset="UTF-8">
     <meta name="htmx-config" content='{"responseHandling": [{"code":".*", "swap": true}]}'>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js" type="text/javascript" charset="utf-8"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js" type="text/javascript" charset="utf-8"></script>
-    <script src=\"https://unpkg.com/hyperscript.org@0.9.14\"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js" type="text/javascript"
+        charset="utf-8"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js" type="text/javascript"
+        charset="utf-8"></script>
     <style>
         body {
-            background-color: #e8f5e9;
-            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             min-height: 100vh;
         }
 
         h1 {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             color: #333;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             text-align: center;
+            font-weight: 600;
         }
 
         .form-container {
             background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             width: 100%;
-            max-width: 800px;
-            padding: 30px;
+            max-width: 900px;
+            padding: 25px 30px;
             box-sizing: border-box;
+            margin-bottom: 30px;
         }
 
-        form div {
+        .form-section {
             margin-bottom: 20px;
         }
 
         label {
-            font-size: 1.2rem;
+            font-size: 1rem;
             color: #555;
             display: block;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
+            font-weight: 600;
         }
 
         input[type="number"] {
-            width: 10%;
-            padding: 15px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            transition: border-color 0.3s ease;
+            width: 80px;
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+            margin-right: 10px;
         }
 
-        #editor, #testEditor {
-            width: 78%;
-            height: 300px;
-            margin-left: 70px;
-            margin-bottom: 20px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
+        button[type="button"],
+        input[type="submit"] {
+            background-color: #00b32d;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-weight: 500;
         }
 
-        input[type="text"]:focus,
-        textarea:focus {
-            border-color: #50a0f7;
+        button[type="button"]:hover,
+        input[type="submit"]:hover {
+            background-color: #008722;
+        }
+
+        input[type="submit"] {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        #editor,
+        #testEditor {
+            width: 100%;
+            height: 350px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+
+        input[type="number"]:focus {
+            border-color: #007bff;
             outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
         }
 
         #risultato {
             margin-top: 20px;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            text-align: center;
-            min-height: 50px;
+            padding: 0;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            text-align: left;
+            min-height: 40px;
+            border: none;
         }
 
-        .successo {
-            background-color: #d4edda;
-            color: #155724;
-            border: 2px solid #c3e6cb;
+        #risultato .errore,
+        #risultato .successo {
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
         }
 
-        .errore {
+        #risultato .errore {
             background-color: #f8d7da;
             color: #721c24;
-            border: 2px solid #f5c6cb;
+            border: 1px solid #f5c6cb;
+            border-left: 5px solid #dc3545;
         }
 
-        input[type="submit"],
-        button {
-            background-color: #3c9aff;
-            color: #fff;
-            border: none;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 1.2rem;
+        #risultato .errore h3 {
+            margin-top: 0;
+            font-size: 1.1rem;
+        }
+
+        #risultato .errore ul {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0;
+        }
+
+        #risultato .errore li {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #f5c6cb;
+        }
+
+        #risultato .errore li:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        #risultato .errore a {
+            color: #721c24;
+            text-decoration: underline;
+            font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.3s ease;
-            width: 100%;
         }
 
-        input[type="submit"]:hover,
-        button:hover {
-            background-color: #3091f8;
+        #risultato .errore a:hover {
+            color: #491217;
         }
 
-        .test-unita {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-            font-size: 1rem;
-            line-height: 1.5;
-            white-space: pre-wrap;
+        #risultato .errore b {
+            color: #721c24;
+            font-weight: 600;
+        }
+
+        #risultato .successo {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            border-left: 5px solid #28a745;
+            font-weight: 600;
+            text-align: center;
         }
 
         .consegna-domanda {
-            width: 95%;
+            width: 100%;
             margin-top: 20px;
             padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
             background-color: #f9f9f9;
-            font-size: 1rem;
+            font-size: 0.95rem;
             line-height: 1.5;
             white-space: pre-wrap;
+            box-sizing: border-box;
+            min-height: 50px;
         }
 
-        .test-fallito {
-            background-color: #fff3cd;
-            border: 2px solid #ffeeba;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-        }
-
-        .test-evidenziato {
-            color: red;
-            font-weight: bold;
-        }
-        
-        
-        
-        /* Nascondi gli elementi che contengono dati per HTMX */
-        .htmx-data {
+        .htmx-indicator {
             display: none;
+            margin-left: 10px;
+            font-style: italic;
+            color: #555;
+        }
+
+        .htmx-request .htmx-indicator {
+            display: inline;
+        }
+
+        .ace_error-line {
+            position: absolute;
+            background: rgba(255, 0, 0, 0.2);
+            z-index: 20;
         }
     </style>
 </head>
 
 <body>
-    <h1>Esegui Test</h1>
+    <h1>Esegui Test JUnit Online</h1>
 
     <div class="form-container">
         <form id="testForm" hx-post="/eseguiTest" hx-target="#risultato" hx-swap="innerHTML" hx-trigger="submit"
-            hx-vals='js:{ codice: editor.getValue() }' hx-on:htmx:after-request="clearErrorMarkers()" >
-
-            <div>
+            hx-vals='js:{ codice: editor.getValue(), idDomanda: document.getElementById("idDomanda").value }'
+            hx-indicator="#spinner-submit" hx-on:htmx:before-request="clearErrorMarkers()"
+            hx-on::after-swap="document.getElementById('consegna-domanda').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+            <div class="form-section">
                 <label for="idDomanda">ID Domanda:</label>
-                <input type="number" id="idDomanda" name="idDomanda" required hx-trigger="input"
-                    hx-include="[name='idDomanda']">
+                <div>
+                    <input type="number" id="idDomanda" name="idDomanda" required hx-trigger="input changed delay:500ms"
+                        hx-get="/mostraDomanda" hx-target="#consegna-domanda" hx-include="this"
+                        hx-indicator="#spinner-load"
+                        hx-on:htmx:before-request="document.getElementById('risultato').innerHTML = ''">
 
-                <div hx-get="/mostraTest" hx-target="#testEditor" hx-trigger="input from:#idDomanda"
-                    hx-include="#idDomanda" hx-swap="none"  hx-on:htmx:after-request="testEditor.setValue(event.detail.xhr.responseText)"></div>
-                <div hx-get="/mostraDomanda" hx-target="#consegna-domanda" hx-trigger="input from:#idDomanda"
-                    hx-include="#idDomanda"></div>
+                    <div hx-get="/mostraTest" hx-target="#testEditor" hx-trigger="input from:#idDomanda"
+                        hx-include="#idDomanda" hx-swap="none"
+                        hx-on:htmx:after-request="testEditor.setValue(event.detail.xhr.responseText)"></div>
+
+                    <span id="spinner-load" class="htmx-indicator"> Caricamento dati domanda...</span>
+                </div>
             </div>
 
             <div id="consegna-domanda" class="consegna-domanda">
-                Consegna Domanda
+                Inserisci un ID Domanda per vedere la consegna.
             </div>
 
-            <div id="risultato" class="risultato">
+            <div id="risultato">
             </div>
 
-            <div>
-                <label for="codice">Codice:</label>
+            <div class="form-section">
+                <label for="editor">Il Tuo Codice Java:</label>
                 <div id="editor"></div>
-                <input type="hidden" name="codice" id="codiceInput">
+            </div>
+
+            <div class="form-section">
+                <label for="testEditor">Codice Test (Sola Lettura):</label>
+                <div id="testEditor">// Il codice del test associato alla domanda verrà caricato qui.</div>
             </div>
 
             <div>
-                <input type="submit" value="Esegui Test">
+                <input type="submit" value="Compila ed Esegui Test">
+                <span id="spinner-submit" class="htmx-indicator"> Compilazione ed esecuzione test...</span>
             </div>
-
         </form>
-
-        <div>
-            <label for="testEditor">Test Domanda:</label>
-            <div id="testEditor"></div>
-            <div id="testContent" style="display:none;"></div>
-        </div>
-        
-        
-        
     </div>
 
     <script>
-        // Variabili globali per gli editor
+        // JavaScript (handleErrorClick, clearErrorMarkers) invariato
         var editor, testEditor;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            // Inizializzazione editor
+        var Range = ace.require('ace/range').Range;
+        window.mainEditorMarker = null;
+        window.testEditorMarker = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
             editor = ace.edit("editor");
             editor.setTheme("ace/theme/eclipse");
             editor.session.setMode("ace/mode/java");
-            editor.setOptions({
-                enableBasicAutocompletion: true,
-                enableSnippets: true,
-                enableLiveAutocompletion: true
-            });
-            
+            editor.setOptions({ enableBasicAutocompletion: true, enableSnippets: true, enableLiveAutocompletion: true, fontSize: "14px", useWorker: false });
+
             testEditor = ace.edit("testEditor");
             testEditor.setTheme("ace/theme/eclipse");
             testEditor.session.setMode("ace/mode/java");
             testEditor.setReadOnly(true);
-            
-            
-          
+            testEditor.setOptions({ fontSize: "14px", highlightActiveLine: false, highlightGutterLine: false, useWorker: false });
         });
 
+        function handleErrorClick(editorName, lineNum, message, type) {
+            var editorInstance = (editorName === 'editor') ? window.editor : window.testEditor;
 
-        function clearErrorMarkers() {
-            // Rimuovi marker e annotazioni dall'editor principale
-            editor.session.clearAnnotations();
-                editor.session.removeMarker(window.aceMarker);
-    
-            // Rimuovi marker e annotazioni dall'editor dei test
-            testEditor.session.clearAnnotations();
-                testEditor.session.removeMarker(window.testAceMarker);
+            const aceLine = lineNum - 1; // Riga 0-based per Ace
+            // Validazione aggiuntiva della riga
+            if (aceLine < 0 || aceLine >= editorInstance.session.getLength()) {
+                return;
+            }
+            var markerIdRef = (editorName === 'editor') ? 'mainEditorMarker' : 'testEditorMarker';
+            
 
+            // Controlla se esiste un ID di marker memorizzato per questo editor.
+            if (window[markerIdRef]) {
+                try {
+                    // Rimuove il marker precedente usando l'ID memorizzato.
+                    editorInstance.session.removeMarker(window[markerIdRef]);
+                    
+                } catch (e) {
+                    // Logga un warning se la rimozione del marker fallisce (potrebbe essere già stato rimosso).
+                    console.warn(`Errore durante la rimozione del marker:`, e);
+                }
+                // Resetta la variabile globale che teneva l'ID del marker.
+                window[markerIdRef] = null;
+            }
+
+            try {
+                // Rimuove TUTTE le annotazioni (icone nel gutter) dalla sessione dell'editor.
+                editorInstance.session.clearAnnotations();
+            } catch (e) {
+                // Logga un warning se la pulizia delle annotazioni fallisce.
+                console.warn(`Errore durante la pulizia delle annotazioni:`, e);
+            }
+
+
+            try {
+                // 1. Aggiungi Annotazione
+                editorInstance.session.setAnnotations([{ row: aceLine, column: 0, text: message, type: type }]);
+
+                // 2. Aggiungi Marker
+                // Calcola range basato sulla lunghezza effettiva della riga
+                const lineLength = editorInstance.session.getLine(aceLine).length;
+                // Usa Math.max(1, lineLength) per assicurare che il range abbia almeno larghezza 1 (per righe vuote)
+                const markerRange = new Range(aceLine, 0, aceLine, Math.max(1, lineLength));
+
+                const newMarkerId = editorInstance.session.addMarker(
+                    markerRange,        // Usa il range calcolato
+                    'ace_error-line',   // Classe CSS
+                    'fullLine',         // Tipo marker
+                    true                // Layer (lasciamo true per ora)
+                );
+                window[markerIdRef] = newMarkerId; // Salva ID nuovo marker
+
+                // 3. Naviga e focus
+                setTimeout(() => {
+                    try {
+                        editorInstance.scrollToLine(lineNum, true, true, function () { });
+                        editorInstance.gotoLine(lineNum, 0, true);
+                        editorInstance.focus();
+
+                        if (editorName === 'testEditor') {
+                            const el = document.getElementById('testEditor');
+                            if (el && typeof el.scrollIntoView === 'function') { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                        }
+                    } catch (navError) { console.error(`Error navigating:`, navError); }
+                }, 0);
+
+            } catch (e) {
+                // Cattura errori specifici di setAnnotations o addMarker se avvengono
+                console.error(`Error setting annotation/marker in ${editorName}:`, e);
+            }
         }
-    
 
+        // Versione CORRETTA (simile a quella nel file originale)
+function clearErrorMarkers() {
+    // Rimuovi marker e annotazioni dall'editor principale
+    if (window.mainEditorMarker) { // Controlla se un marker esiste
+        editor.session.removeMarker(window.mainEditorMarker); // Usa l'ID salvato
+        window.mainEditorMarker = null; // Resetta l'ID
+    }
+    editor.session.clearAnnotations(); // Questo era corretto
 
+    // Rimuovi marker e annotazioni dall'editor dei test
+    if (window.testEditorMarker) { // Controlla se un marker esiste
+         testEditor.session.removeMarker(window.testEditorMarker); // Usa l'ID salvato
+         window.testEditorMarker = null; // Resetta l'ID
+    }
+    testEditor.session.clearAnnotations(); // Questo era corretto
+}
     </script>
-    
-    <style>
-        .ace_error-line {
-            position: absolute;
-            background: rgba(255, 200, 200, 0.3);
-            z-index: 4;
-        }
-    </style>
+
 </body>
+
 </html>

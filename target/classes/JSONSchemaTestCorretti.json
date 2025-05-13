@@ -1,5 +1,0 @@
-{
-  "$schema": "http://json-schema.org/draft-01/schema#",
-  "type": "string",
-  "enum": ["TEST ANDATI A BUON FINE"]
-}

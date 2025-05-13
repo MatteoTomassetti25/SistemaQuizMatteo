@@ -1,222 +1,160 @@
-package it.sistemaquiz.controller;
+package it.sistemaquiz.controller; // Assicurati che il package sia corretto
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringEscapeUtils;
+// Rimosso import logger
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication; // Opzionale: per Spring Security
+import org.springframework.security.core.context.SecurityContextHolder; // Opzionale: per Spring Security
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import it.sistemaquiz.authentication.ApplicationConfiguration;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+// Import Entità, Repository, Service e il risultato custom
 import it.sistemaquiz.entity.Codice;
 import it.sistemaquiz.entity.Domanda;
 import it.sistemaquiz.entity.Utente;
 import it.sistemaquiz.repository.CodiceRepository;
 import it.sistemaquiz.repository.DomandaRepository;
 import it.sistemaquiz.repository.UtenteRepository;
-import it.sistemaquiz.service.AceEditorService;
 import it.sistemaquiz.service.CodiceService;
-import org.springframework.web.bind.annotation.RequestBody;
+import it.sistemaquiz.service.CodiceService.ExecutionResult; // Importa la classe interna
 
 
 @RestController
 public class CodiceController {
 
-    private final ApplicationConfiguration applicationConfiguration;
+    // Rimosso campo logger
+
+    private final CodiceService codiceService;
+    private final CodiceRepository codiceRepository;
+    private final DomandaRepository domandaRepository;
+    private final UtenteRepository utenteRepository;
 
     @Autowired
-    CodiceService codiceService;
-
-    @Autowired
-    CodiceRepository codiceRepository;
-
-    @Autowired
-    DomandaRepository domandaRepository;
-
-    @Autowired
-    UtenteRepository utenteRepository;
-
-    @Autowired
-    AceEditorService aceEditorService;
-
-    public CodiceController(CodiceService codiceService, ApplicationConfiguration applicationConfiguration) {
+    public CodiceController(CodiceService codiceService,
+                            CodiceRepository codiceRepository,
+                            DomandaRepository domandaRepository,
+                            UtenteRepository utenteRepository) {
         this.codiceService = codiceService;
-        this.applicationConfiguration = applicationConfiguration;
+        this.codiceRepository = codiceRepository;
+        this.domandaRepository = domandaRepository;
+        this.utenteRepository = utenteRepository;
     }
 
+    @ApiResponse
     @PostMapping("/eseguiTest")
-public ResponseEntity<?> eseguiTest(@RequestParam Long idDomanda, @RequestParam String codice) {
-    if (idDomanda == null) {
-        return ResponseEntity.status(400).body("Domanda non trovata");
-    }
+    public ResponseEntity<String> eseguiTest(@RequestParam(required = false) Long idDomanda,
+                                             @RequestParam(required = false) String codice) {
 
-    
-
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    String matricola = "123456"; 
-
-    Utente utente = utenteRepository.findByMatricola(matricola)
-            .orElseThrow(() -> new RuntimeException("Utente non trovato"));
-
-    Domanda domanda = this.domandaRepository.findById(idDomanda)
-            .orElseThrow(() -> new IllegalArgumentException("Domanda non trovata"));
-
-    String test = domanda.getTest();
-
-    String nomeClassePrincipale = codiceService.estraiNomeClasse(codice);
-    String nomeClasseTest = codiceService.estraiNomeClasse(test);
-
-    if (nomeClassePrincipale == null) {
-        return ResponseEntity.badRequest()
-                .body("<div class='errore'>Errore: La classe inserita non è valida</div>");
-    }
-
-    String codiceTestAggiornato = test.replace("CodiceUtente", nomeClassePrincipale);
-
-    Map<String, String> codiceClassi = new HashMap<>();
-    codiceClassi.put(nomeClassePrincipale, codice);
-    codiceClassi.put(nomeClasseTest, codiceTestAggiornato);
-
-    try {
-        Map<String, Class<?>> classiCompilate = codiceService.caricaClassiCompilate(codiceClassi);
-        Class<?> classeUtente = classiCompilate.get(nomeClassePrincipale);
-        Class<?> classeTest = classiCompilate.get(nomeClasseTest);
-
-        List<Map<String, String>> risultatiTest = codiceService.eseguiTestJUnit(classeUtente, classeTest);
-
-        if (codiceService.getOutput()) {
-            codiceRepository.save(new Codice(codice, utente, domanda, true));
-            return ResponseEntity.ok("<div class='successo'>TEST ANDATI A BUON FINE</div>");
-        } else {
-            codiceRepository.save(new Codice(codice, utente, domanda, false));
-
-            StringBuilder outputMessaggio = new StringBuilder();
-            outputMessaggio.append("<div class='errore'><h3>Errore nei test:</h3><ul>");
-
-            for (Map<String, String> risultato : risultatiTest) {
-                String testName = risultato.get("test");
-                String errore = risultato.get("errore");
-                // Usa direttamente il numero di riga fornito dal service
-                int lineNumber = Integer.parseInt(risultato.get("lineNumber"));
-
-                testName = testName.replaceAll("<[^>]*>", "").replaceAll("\\s+", "");
-                String testMethodName = testName.replaceAll(".*\\btest([a-zA-Z0-9_]+).*", "test$1");
-                String testId = "test_" + testMethodName;
-
-                outputMessaggio.append("<li> ")
-                    .append("<a href='#' onclick='highlightErrorInEditor(").append(lineNumber).append("); return false;' ")
-                    .append("data-testid='").append(testId).append("'>")
-                    .append(testId)
-                    .append("</a><br><b>Errore:</b> ")
-                    .append(errore)
-                    .append("</li>");
-            }
-
-            outputMessaggio.append("</ul></div>");
-
-            // Utilizzo del servizio AceEditorService per generare lo script
-            outputMessaggio.append(aceEditorService.createTestErrorHandlingScript());
-            
-            return ResponseEntity.badRequest().body(outputMessaggio.toString());
-        }
-
-    } catch (Exception e) {
-        // Estrai i numeri di riga degli errori di compilazione direttamente dall'eccezione
-        String errorMessage = "<div class='errore'>Errore: " + e.getMessage() + "</div>";
-        
-        // Cerca informazioni sugli errori di compilazione nelle eccezioni soppresse
-        Map<String, Integer> erroriCompilazione = new HashMap<>();
-        for (Throwable suppressed : e.getSuppressed()) {
-            String message = suppressed.getMessage();
-            if (message != null && message.startsWith("ERRORI_COMPILAZIONE:")) {
-                try {
-                    // Estrai la mappa degli errori dal messaggio
-                    String mapString = message.substring("ERRORI_COMPILAZIONE:".length());
-                    // Parsing semplificato della mappa
-                    mapString = mapString.substring(1, mapString.length() - 1); // Rimuovi { }
-                    String[] entries = mapString.split(", ");
-                    for (String entry : entries) {
-                        String[] keyValue = entry.split("=");
-                        if (keyValue.length == 2) {
-                            String key = keyValue[0];
-                            int value = Integer.parseInt(keyValue[1]);
-                            erroriCompilazione.put(key, value);
-                        }
-                    }
-                } catch (Exception ex) {
-                    // Ignora errori di parsing
-                }
-                break;
-            }
-        }
-        
-        // Se abbiamo trovato errori di compilazione, aggiungi lo script per evidenziare la prima riga con errore
-        if (!erroriCompilazione.isEmpty()) {
-            // Prendi il primo errore per evidenziarlo
-            int lineNumber = erroriCompilazione.values().iterator().next();
-            
-            errorMessage += "<script>" +
-                "document.addEventListener('DOMContentLoaded', function() {" +
-                "   const editor = ace.edit('editor');" +
-                aceEditorService.createErrorMarkerScript("editor", lineNumber, "Errore di compilazione") +
-                aceEditorService.createHighlightLineScript("editor", lineNumber, "error-line") +
-                "   editor.scrollToLine(" + lineNumber + ", true, true);" +
-                "});" +
-                "</script>";
-        }
-
-        return ResponseEntity.badRequest().body(errorMessage);
-    }
-}
-
-    @GetMapping("/mostraTest")
-    public ResponseEntity<String> mostraTest(@RequestParam Long idDomanda,
-                                             @RequestParam(required = false) Integer highlightLine) {
         if (idDomanda == null) {
-            return ResponseEntity.badRequest().body("Domanda non disponibile");
+            return ResponseEntity.badRequest().body("<div class='errore'>ID Domanda mancante.</div>");
+        }
+        if (codice == null || codice.trim().isEmpty()) {
+             return ResponseEntity.badRequest().body("<div class='errore'>Il codice fornito non può essere vuoto.</div>");
         }
 
-        Optional<Domanda> domandaOptional = domandaRepository.findById(idDomanda);
+        String matricola;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getName())) {
+            matricola = authentication.getName();
+        } else {
+            matricola = "123456"; 
+        }
 
+        Utente utente;
+        Optional<Domanda> domandaOpt;
+        try {
+             utente = utenteRepository.findByMatricola(matricola)
+                    .orElseThrow(() -> new ResourceNotFoundException("Utente '" + StringEscapeUtils.escapeHtml4(matricola) + "' non trovato."));
+
+             domandaOpt = domandaRepository.findById(idDomanda);
+             if (domandaOpt.isEmpty()) {
+                  throw new ResourceNotFoundException("Domanda con ID " + idDomanda + " non trovata.");
+             }
+
+        } catch (ResourceNotFoundException rnfe) {
+             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("<div class='errore'>" + rnfe.getMessage() + "</div>");
+        } catch (Exception e) {
+             // Log rimosso, ma potresti voler gestire l'eccezione in modo diverso
+             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("<div class='errore'>Errore interno durante il recupero dei dati.</div>");
+        }
+
+        Domanda domanda = domandaOpt.get();
+
+        ExecutionResult result;
+        try {
+            result = codiceService.eseguiCompilazioneETest(domanda, codice);
+        } catch (Exception ex) {
+            // Log rimosso
+            result = ExecutionResult.internalError("Errore critico durante l'elaborazione: " + ex.getMessage());
+        }
+
+         try {
+             codiceRepository.save(new Codice(codice, utente, domanda, result.overallSuccess));
+         } catch (Exception dbEx) {
+             // Log rimosso, errore DB non bloccante per la risposta utente
+         }
+
+        HttpStatus status = result.overallSuccess ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
+        if (result.htmlBody.contains("Errore interno") || result.htmlBody.contains("Errore critico")) {
+             status = HttpStatus.INTERNAL_SERVER_ERROR;
+        } else if (result.compilationError) {
+            status = HttpStatus.BAD_REQUEST;
+        } else if (!result.overallSuccess) {
+             status = HttpStatus.BAD_REQUEST;
+        }
+
+        return ResponseEntity.status(status).body(result.htmlBody);
+    }
+
+
+    @ApiResponse
+    @GetMapping("/mostraTest")
+    public ResponseEntity<String> mostraTest(@RequestParam(required = false) Long idDomanda) {
+        if (idDomanda == null) {
+             return ResponseEntity.badRequest().body("// Errore: ID Domanda mancante nella richiesta.");
+        }
+        Optional<Domanda> domandaOptional = domandaRepository.findById(idDomanda);
         if (domandaOptional.isPresent()) {
             String test = domandaOptional.get().getTest();
             if (test == null || test.isEmpty()) {
-                return ResponseEntity.status(400).body("Nessun test disponibile");
-            }
-
-            if (highlightLine != null) {
-                // Utilizzo del servizio AceEditorService per generare lo script
-                String script = aceEditorService.createTestHighlightScript(highlightLine);
-                return ResponseEntity.ok(test + script);
+                return ResponseEntity.ok("// Nessun test disponibile per questa domanda.");
             }
             return ResponseEntity.ok(test);
+        } else {
+             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("// Errore: Domanda con ID " + idDomanda + " non trovata.");
         }
-        return ResponseEntity.status(404).body("Domanda non trovata");
     }
 
+    @ApiResponse
     @GetMapping("/mostraDomanda")
-    public ResponseEntity<String> mostraDomanda(@RequestParam Long idDomanda) {
+    public ResponseEntity<String> mostraDomanda(@RequestParam(required = false) Long idDomanda) {
         if (idDomanda == null) {
-            return ResponseEntity.status(400).body("Domanda non disponibile");
+             return ResponseEntity.badRequest().body("Errore: ID Domanda mancante nella richiesta.");
         }
-
-        Optional<Domanda> domandaOptional = domandaRepository.findById(idDomanda);
-
-        if (domandaOptional.isPresent()) {
-            String consegna = domandaOptional.get().getDomanda();
-            return consegna != null && !consegna.isEmpty()
-                ? ResponseEntity.ok(consegna)
-                : ResponseEntity.badRequest().body("Nessuna consegna disponibile");
+        Optional<Domanda> domOpt = domandaRepository.findById(idDomanda);
+        if (domOpt.isPresent()) {
+            String consegna = domOpt.get().getDomanda();
+            if (consegna != null && !consegna.isEmpty()) {
+                 return ResponseEntity.ok(consegna);
+            } else {
+                 return ResponseEntity.ok("Nessuna consegna disponibile per questa domanda.");
+            }
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Errore: Domanda con ID " + idDomanda + " non trovata.");
         }
-        return ResponseEntity.status(404).body("Domanda non trovata");
+    }
+
+    // Classe eccezione helper
+    private static class ResourceNotFoundException extends RuntimeException {
+        public ResourceNotFoundException(String message) {
+            super(message);
+        }
     }
 }
