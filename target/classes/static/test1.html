@@ -6,6 +6,7 @@
     <meta charset="UTF-8">
     <meta name="htmx-config" content='{"responseHandling": [{"code":".*", "swap": true}]}'>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js" type="text/javascript"
         charset="utf-8"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js" type="text/javascript"
@@ -20,6 +21,7 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            padding-top: 60px; /* Aggiunto padding per non sovrapporre con l'info utente */
         }
 
         h1 {
@@ -203,28 +205,55 @@
             background: rgba(255, 0, 0, 0.2);
             z-index: 20;
         }
+
+        /* Stile per il box informazioni utente in alto a destra */
+        #user-info-container {
+            position: fixed; /* Fissato rispetto alla viewport */
+            top: 10px;       /* Distanza dal bordo superiore */
+            right: 20px;     /* Distanza dal bordo destro */
+            padding: 8px 12px;
+            background-color: #e9ecef; /* Un colore di sfondo leggero */
+            border: 1px solid #ced4da; /* Un bordo sottile */
+            border-radius: 4px;        /* Angoli arrotondati */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Una leggera ombra */
+            z-index: 1000; /* Per assicurarsi che sia sopra gli altri elementi */
+            font-size: 0.9em;
+        }
     </style>
 </head>
 
 <body>
-    <h1>Esegui Test JUnit Online</h1>
+    <div id="user-info-container"
+         hx-get="/utenti/me/matricola"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        Caricamento matricola...
+    </div>
+
+    <h1>SistemaQuiz per il corso di POO</h1>
 
     <div class="form-container">
-        <form id="testForm" hx-post="/eseguiTest" hx-target="#risultato" hx-swap="innerHTML" hx-trigger="submit"
-            hx-vals='js:{ codice: editor.getValue(), idDomanda: document.getElementById("idDomanda").value }'
-            hx-indicator="#spinner-submit" hx-on:htmx:before-request="clearErrorMarkers()"
-            hx-on::after-swap="document.getElementById('consegna-domanda').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+        <form hx-validate="false" id="testForm"
+            hx-post="/eseguiTest"
+            hx-target="#risultato"
+            hx-swap="innerHTML"
+            hx-trigger="submit"
+            hx-ext="json-enc" hx-indicator="#spinner-submit"
+            hx-on:htmx:before-request="document.getElementById('hiddenCodiceVal').value = editor.getValue(); clearErrorMarkers();" hx-on::after-swap="document.getElementById('consegna-domanda').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+
+            <input type="hidden" name="codice" id="hiddenCodiceVal">
+
             <div class="form-section">
                 <label for="idDomanda">ID Domanda:</label>
                 <div>
-                    <input type="number" id="idDomanda" name="idDomanda" required hx-trigger="input changed delay:500ms"
+                    <input  id="idDomanda" name="idDomanda" type="number" hx-trigger="input changed delay:500ms"
                         hx-get="/mostraDomanda" hx-target="#consegna-domanda" hx-include="this"
                         hx-indicator="#spinner-load"
                         hx-on:htmx:before-request="document.getElementById('risultato').innerHTML = ''">
 
                     <div hx-get="/mostraTest" hx-target="#testEditor" hx-trigger="input from:#idDomanda"
                         hx-include="#idDomanda" hx-swap="none"
-                        hx-on:htmx:after-request="testEditor.setValue(event.detail.xhr.responseText)"></div>
+                        hx-on:htmx:after-request="testEditor.setValue(event.detail.xhr.responseText || '// Errore caricamento test o test non disponibile.')"></div>
 
                     <span id="spinner-load" class="htmx-indicator"> Caricamento dati domanda...</span>
                 </div>
@@ -235,7 +264,7 @@
             </div>
 
             <div id="risultato">
-            </div>
+                </div>
 
             <div class="form-section">
                 <label for="editor">Il Tuo Codice Java:</label>
@@ -255,7 +284,6 @@
     </div>
 
     <script>
-        // JavaScript (handleErrorClick, clearErrorMarkers) invariato
         var editor, testEditor;
         var Range = ace.require('ace/range').Range;
         window.mainEditorMarker = null;
@@ -272,61 +300,65 @@
             testEditor.session.setMode("ace/mode/java");
             testEditor.setReadOnly(true);
             testEditor.setOptions({ fontSize: "14px", highlightActiveLine: false, highlightGutterLine: false, useWorker: false });
+
+            const initialTestContent = "// Il codice del test associato alla domanda verrà caricato qui dopo aver inserito un ID Domanda valido.";
+            if (testEditor.getValue() === "") {
+                testEditor.setValue(initialTestContent, -1);
+            }
+
+            var testLoaderDiv = document.querySelector('div[hx-get="/mostraTest"]');
+            if(testLoaderDiv) {
+                testLoaderDiv.addEventListener('htmx:afterRequest', function(event) {
+                    if (event.detail.xhr.status === 200) {
+                        if (event.detail.xhr.responseText && event.detail.xhr.responseText.trim() !== "") {
+                            testEditor.setValue(event.detail.xhr.responseText, -1);
+                        } else {
+                            testEditor.setValue("// Nessun test disponibile per questa domanda o test vuoto.", -1);
+                        }
+                    } else {
+                        testEditor.setValue("// Errore nel caricamento del test: " + event.detail.xhr.statusText, -1);
+                    }
+                     if (window.testEditorMarker) {
+                         testEditor.session.removeMarker(window.testEditorMarker);
+                         window.testEditorMarker = null;
+                     }
+                     testEditor.session.clearAnnotations();
+                });
+            }
         });
 
         function handleErrorClick(editorName, lineNum, message, type) {
             var editorInstance = (editorName === 'editor') ? window.editor : window.testEditor;
+            const aceLine = lineNum - 1;
 
-            const aceLine = lineNum - 1; // Riga 0-based per Ace
-            // Validazione aggiuntiva della riga
             if (aceLine < 0 || aceLine >= editorInstance.session.getLength()) {
+                 console.warn("handleErrorClick: Numero di riga (" + lineNum + ") fuori dai limiti per l'editor " + editorName);
                 return;
             }
             var markerIdRef = (editorName === 'editor') ? 'mainEditorMarker' : 'testEditorMarker';
-            
 
-            // Controlla se esiste un ID di marker memorizzato per questo editor.
             if (window[markerIdRef]) {
                 try {
-                    // Rimuove il marker precedente usando l'ID memorizzato.
                     editorInstance.session.removeMarker(window[markerIdRef]);
-                    
                 } catch (e) {
-                    // Logga un warning se la rimozione del marker fallisce (potrebbe essere già stato rimosso).
-                    console.warn(`Errore durante la rimozione del marker:`, e);
+                    console.warn(`Errore durante la rimozione del marker precedente:`, e);
                 }
-                // Resetta la variabile globale che teneva l'ID del marker.
                 window[markerIdRef] = null;
             }
 
             try {
-                // Rimuove TUTTE le annotazioni (icone nel gutter) dalla sessione dell'editor.
                 editorInstance.session.clearAnnotations();
             } catch (e) {
-                // Logga un warning se la pulizia delle annotazioni fallisce.
                 console.warn(`Errore durante la pulizia delle annotazioni:`, e);
             }
 
-
             try {
-                // 1. Aggiungi Annotazione
                 editorInstance.session.setAnnotations([{ row: aceLine, column: 0, text: message, type: type }]);
-
-                // 2. Aggiungi Marker
-                // Calcola range basato sulla lunghezza effettiva della riga
                 const lineLength = editorInstance.session.getLine(aceLine).length;
-                // Usa Math.max(1, lineLength) per assicurare che il range abbia almeno larghezza 1 (per righe vuote)
                 const markerRange = new Range(aceLine, 0, aceLine, Math.max(1, lineLength));
+                const newMarkerId = editorInstance.session.addMarker(markerRange, 'ace_error-line', 'fullLine', true);
+                window[markerIdRef] = newMarkerId;
 
-                const newMarkerId = editorInstance.session.addMarker(
-                    markerRange,        // Usa il range calcolato
-                    'ace_error-line',   // Classe CSS
-                    'fullLine',         // Tipo marker
-                    true                // Layer (lasciamo true per ora)
-                );
-                window[markerIdRef] = newMarkerId; // Salva ID nuovo marker
-
-                // 3. Naviga e focus
                 setTimeout(() => {
                     try {
                         editorInstance.scrollToLine(lineNum, true, true, function () { });
@@ -337,33 +369,39 @@
                             const el = document.getElementById('testEditor');
                             if (el && typeof el.scrollIntoView === 'function') { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
                         }
-                    } catch (navError) { console.error(`Error navigating:`, navError); }
+                    } catch (navError) { console.error(`Errore durante la navigazione nell'editor:`, navError); }
                 }, 0);
 
             } catch (e) {
-                // Cattura errori specifici di setAnnotations o addMarker se avvengono
-                console.error(`Error setting annotation/marker in ${editorName}:`, e);
+                console.error(`Errore durante l'impostazione di annotazione/marker in ${editorName}:`, e);
             }
         }
 
-        // Versione CORRETTA (simile a quella nel file originale)
-function clearErrorMarkers() {
-    // Rimuovi marker e annotazioni dall'editor principale
-    if (window.mainEditorMarker) { // Controlla se un marker esiste
-        editor.session.removeMarker(window.mainEditorMarker); // Usa l'ID salvato
-        window.mainEditorMarker = null; // Resetta l'ID
-    }
-    editor.session.clearAnnotations(); // Questo era corretto
+        function clearErrorMarkers() {
+            // Popola il campo nascosto del codice prima di pulire i marker,
+            // anche se hx-on:htmx:before-request dovrebbe già farlo.
+            // Potrebbe essere ridondante ma innocuo.
+            if (window.editor) {
+                 // document.getElementById('hiddenCodiceVal').value = editor.getValue(); // Opzionale qui
+            }
 
-    // Rimuovi marker e annotazioni dall'editor dei test
-    if (window.testEditorMarker) { // Controlla se un marker esiste
-         testEditor.session.removeMarker(window.testEditorMarker); // Usa l'ID salvato
-         window.testEditorMarker = null; // Resetta l'ID
-    }
-    testEditor.session.clearAnnotations(); // Questo era corretto
-}
+            if (window.editor && window.editor.session) {
+                if (window.mainEditorMarker) {
+                    window.editor.session.removeMarker(window.mainEditorMarker);
+                    window.mainEditorMarker = null;
+                }
+                window.editor.session.clearAnnotations();
+            }
+
+            if (window.testEditor && window.testEditor.session) {
+                if (window.testEditorMarker) {
+                     window.testEditor.session.removeMarker(window.testEditorMarker);
+                     window.testEditorMarker = null;
+                }
+                window.testEditor.session.clearAnnotations();
+            }
+        }
     </script>
 
 </body>
-
 </html>

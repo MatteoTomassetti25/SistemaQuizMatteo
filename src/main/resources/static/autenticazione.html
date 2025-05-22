@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="htmx-config" content='{"responseHandling": [{"code":".*", "swap": true}]}'>
+    <title>Autenticazione Sistema Quiz</title>
+    <script src="https://unpkg.com/htmx.org@2.0.0/dist/htmx.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-bottom: 20px; max-width: 500px; margin-left: auto; margin-right: auto; }
+        h1, h2 { color: #0056b3; text-align: center; }
+        label { display: block; margin-top: 10px; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="password"], input[type="submit"], button {
+            width: calc(100% - 22px); 
+            padding: 10px; 
+            margin-bottom: 10px; 
+            border-radius: 4px; 
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+        input[type="submit"], button { 
+            background-color: #007bff; 
+            color: white; 
+            cursor: pointer; 
+            border: none; 
+        }
+        input[type="submit"]:hover, button:hover { 
+            background-color: #0056b3; 
+        }
+        .response-area { 
+            margin-top:10px; 
+            padding:10px; 
+            border:1px dashed #ddd; 
+            background-color:#f9f9f9; 
+            min-height: 50px; 
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
+            text-align: center;
+        }
+        .error { color: red; font-weight: bold; background-color: #fdd; border-left: 5px solid red; }
+        .success { color: green; font-weight: bold; background-color: #dfd; border-left: 5px solid green;}
+    </style>
+</head>
+<body>
+
+    <h1>AUtenticazione Sistema Quiz POO</h1>
+
+    <div class="container">
+        <h2>Registrazione Utente</h2>
+        <form hx-post="/auth/signup" hx-target="#signupResponse" hx-swap="innerHTML">
+            <label for="signupNome">Nome:</label>
+            <input id="signupNome" name="nome" type="text" value="">
+            
+            <label for="signupCognome">Cognome:</label>
+            <input id="signupCognome" name="cognome" type="text" value="">
+            
+            <label for="signupMatricola">Matricola:</label>
+            <input id="signupMatricola" name="matricola" type="text" required value="">
+            
+            <label for="signupPassword">Password:</label>
+            <input id="signupPassword" name="password" type="password" required value="">
+            
+            <input type="submit" value="Registrati">
+        </form>
+        <div id="signupResponse" class="response-area">
+            </div>
+    </div>
+
+    <div class="container">
+        <h2>Login Utente</h2>
+        <form id="loginForm" hx-post="/auth/login" hx-target="#loginResponse" hx-swap="innerHTML">
+            <label for="loginMatricola">Matricola:</label>
+            <input id="loginMatricola" name="matricola" type="text" required value="">
+            
+            <label for="loginPassword">Password:</label>
+            <input id="loginPassword" name="password" type="password" required value="">
+            
+            <input type="submit" value="Login">
+        </form>
+        <div id="loginResponse" class="response-area">
+            </div>
+        
+    </div>
+
+    </body>
+</html>

@@ -50,4 +50,11 @@ public class AuthenticationService {
         return utenteRepository.findByMatricola(input.getMatricola())
                 .orElseThrow();
     }
+
+    // In AuthenticationService.java
+// ...
+public boolean utenteExists(String matricola) {
+    return utenteRepository.findByMatricola(matricola).isPresent();
+}
+// ...
 }

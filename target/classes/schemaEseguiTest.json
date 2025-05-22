@@ -1,0 +1,153 @@
+
+{
+    "openapi": "3.0.3",
+    "info": {
+      "title": "Sistema Quiz POO - API Esecuzione Test",
+      "version": "1.0.0",
+      "description": "API per l'esecuzione di test di codice Java per le domande del quiz."
+    },
+    "servers": [
+      {
+        "url": "http://localhost:8080",
+        "description": "Server di sviluppo locale"
+      }
+    ],
+    "components": {
+      "schemas": {
+        "EseguiTestRequest": {
+          "type": "object",
+          "title": "EseguiTestRequest",
+          "description": "Dati necessari per eseguire un test su una domanda specifica.",
+          "required": [
+            "idDomanda",
+            "codice"
+          ],
+          "properties": {
+            "idDomanda": {
+              "type": "integer",
+              "format": "int64",
+              "description": "L'ID univoco della domanda per cui eseguire il test. Deve essere un numero positivo maggiore di zero.",
+              "example": 1,
+              "minimum": 1
+            },
+            "codice": {
+              "type": "string",
+              "description": "Il codice Java sorgente fornito dall'utente da compilare e testare. Deve avere tra 10 e 10000 caratteri.",
+              "example": "public class Soluzione {\n    public String saluta() {\n        return \"Ciao Mondo!\";\n    }\n}",
+              "minLength": 10,
+              "maxLength": 10000
+            }
+          }
+        },
+        "ExecutionResultResponse": {
+          "type": "object",
+          "description": "Risultato dell'esecuzione del test, fornito come frammento HTML.",
+          "properties": {
+            "htmlBody": {
+              "type": "string",
+              "format": "html",
+              "description": "Il corpo HTML della risposta, contenente l'esito della compilazione e dei test."
+            }
+          }
+        },
+        "ErrorResponse": {
+          "type": "object",
+          "description": "Risposta di errore generica o di validazione, fornita come frammento HTML.",
+          "properties": {
+            "htmlErrorBody": {
+              "type": "string",
+              "format": "html",
+              "description": "Il corpo HTML dell'errore."
+            }
+          }
+        }
+      },
+      "securitySchemes": {
+        "bearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "Autenticazione JWT."
+        }
+      }
+    },
+    "paths": {
+      "/eseguiTest": {
+        "post": {
+          "summary": "Compila ed esegue il codice Java fornito contro i test di una domanda specifica.",
+          "tags": [
+            "Esecuzione Test"
+          ],
+          "security": [
+            {
+              "bearerAuth": []
+            }
+          ],
+          "requestBody": {
+            "description": "Dati per l'esecuzione del test, includendo l'ID della domanda e il codice sorgente.",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EseguiTestRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Test eseguiti con successo (anche se potrebbero essere falliti). Il corpo della risposta contiene l'output HTML.",
+              "content": {
+                "text/html": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ExecutionResultResponse"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Richiesta non valida a causa di dati di input errati (fallimento validazione).",
+              "content": {
+                "text/html": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Non autorizzato. L'utente deve essere autenticato.",
+               "content": {
+                "text/html": {
+                  "schema": {
+                    "type": "string",
+                    "example": "<div class='errore'>Non autorizzato.</div>"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Domanda o Utente non trovato.",
+               "content": {
+                "text/html": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "500": {
+              "description": "Errore interno del server durante la compilazione o l'esecuzione dei test.",
+              "content": {
+                "text/html": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }

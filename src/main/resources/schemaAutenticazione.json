@@ -1,0 +1,262 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+      "title": "Sistema Quiz POO - Autenticazione",
+      "version": "1.0.0",
+      "description": "API per l'autenticazione degli utenti del Sistema Quiz."
+    },
+    "servers": [
+      {
+        "url": "http://localhost:8080",
+        "description": "Server di sviluppo locale"
+      }
+    ],
+    "components": {
+      "schemas": {
+        "SignupRequest": {
+          "type": "object",
+          "title": "SignupRequest",
+          "description": "Dati necessari per la registrazione di un nuovo utente.",
+          "required": [
+            "matricola",
+            "password"
+          ],
+          "properties": {
+            "nome": {
+              "type": "string",
+              "description": "Nome dell'utente."
+            },
+            "cognome": {
+              "type": "string",
+              "description": "Cognome dell'utente."
+            },
+            "matricola": {
+              "type": "string",
+              "description": "Matricola univoca dell'utente.",
+              "example": "123456"
+            },
+            "password": {
+              "type": "string",
+              "format": "password",
+              "description": "Password dell'utente (min. 8 caratteri).",
+              "example": "password123"
+            }
+          }
+        },
+        "UserResponse": {
+          "type": "object",
+          "title": "UserResponse",
+          "description": "Dati dell'utente registrato o recuperato.",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "format": "int32",
+              "description": "ID univoco dell'utente."
+            },
+            "nome": {
+              "type": "string",
+              "description": "Nome dell'utente."
+            },
+            "cognome": {
+              "type": "string",
+              "description": "Cognome dell'utente."
+            },
+            "matricola": {
+              "type": "string",
+              "description": "Matricola dell'utente."
+            }
+          }
+        },
+        "LoginRequest": {
+          "type": "object",
+          "title": "LoginRequest",
+          "description": "Credenziali per l'accesso dell'utente.",
+          "required": [
+            "matricola",
+            "password"
+          ],
+          "properties": {
+            "matricola": {
+              "type": "string",
+              "description": "Matricola dell'utente.",
+              "example": "123456"
+            },
+            "password": {
+              "type": "string",
+              "format": "password",
+              "description": "Password dell'utente.",
+              "example": "password123"
+            }
+          }
+        },
+        "LoginResponse": {
+          "type": "object",
+          "title": "LoginResponse",
+          "description": "Risposta del server al login, include il token JWT.",
+          "properties": {
+            "token": {
+              "type": "string",
+              "description": "Token JWT per l'autenticazione."
+            },
+            "expiresIn": {
+              "type": "integer",
+              "format": "int64",
+              "description": "Durata del token in millisecondi."
+            }
+          }
+        },
+        "ErrorResponse": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Lo stato della risposta (es. \"error\")."
+            },
+            "messaggio": {
+              "type": "string",
+              "description": "Un messaggio che descrive l'errore."
+            }
+          },
+          "example": {
+            "status": "error",
+            "messaggio": "Credenziali non valide."
+          }
+        }
+      },
+      "securitySchemes": {
+        "bearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "Autenticazione JWT. Inserire il token preceduto da 'Bearer ' (es. Bearer xxx.yyy.zzz)"
+        }
+      }
+    },
+    "paths": {
+      "/auth/signup": {
+        "post": {
+          "summary": "Registra un nuovo utente",
+          "tags": [
+            "Autenticazione"
+          ],
+          "requestBody": {
+            "description": "Dati per la registrazione.",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Utente registrato con successo.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Richiesta non valida (es. dati mancanti, matricola già esistente).",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/login": {
+        "post": {
+          "summary": "Autentica un utente e restituisce un token JWT",
+          "tags": [
+            "Autenticazione"
+          ],
+          "requestBody": {
+            "description": "Credenziali di accesso.",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Autenticazione riuscita.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/LoginResponse"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Richiesta non valida.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Credenziali non valide.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/utenti/me": {
+          "get": {
+              "summary": "Ottiene i dettagli dell'utente autenticato",
+              "tags": ["Utenti"],
+              "security": [
+                  {
+                      "bearerAuth": []
+                  }
+              ],
+              "responses": {
+                  "200": {
+                      "description": "Dettagli dell'utente autenticato",
+                      "content": {
+                          "application/json": {
+                              "schema": {
+                                  "$ref": "#/components/schemas/UserResponse" 
+                              }
+                          }
+                      }
+                  },
+                  "401": {
+                      "description": "Non autorizzato",
+                       "content": {
+                          "application/json": {
+                              "schema": {
+                                  "$ref": "#/components/schemas/ErrorResponse"
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+    }
+  }

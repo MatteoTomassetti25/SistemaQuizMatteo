@@ -2,6 +2,7 @@ package it.sistemaquiz.authentication;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie; // Importato
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.lang.NonNull;
@@ -20,7 +21,6 @@ import java.io.IOException;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final HandlerExceptionResolver handlerExceptionResolver;
-
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
 
@@ -40,36 +40,47 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         @NonNull HttpServletResponse response,
         @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
-        final String authHeader = request.getHeader("Authorization");
+        
+        String jwt = null;
+        // Estrai il token JWT dal cookie "jwtToken"
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("jwtToken".equals(cookie.getName())) {
+                    jwt = cookie.getValue();
+                    break;
+                }
+            }
+        }
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // Se non c'è token nel cookie, procedi con la catena dei filtri
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
         try {
-            final String jwt = authHeader.substring(7);
-            final String userID = jwtService.extractUsername(jwt);
+            final String userMatricola = jwtService.extractUsername(jwt); // extractUsername ora estrae la matricola
 
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-            if (userID != null && authentication == null) {
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userID);
+            // Se la matricola è presente e l'utente non è ancora autenticato
+            if (userMatricola != null && authentication == null) {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userMatricola); // Carica utente per matricola
 
+                // Se il token è valido, configura Spring Security per l'autenticazione manuale
                 if (jwtService.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
-                            null,
+                            null, // Nessuna credenziale (password) necessaria qui
                             userDetails.getAuthorities()
                     );
-
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
-
             filterChain.doFilter(request, response);
         } catch (Exception exception) {
+            // In caso di errore durante la validazione del token, delega all'handler delle eccezioni
             handlerExceptionResolver.resolveException(request, response, null, exception);
         }
     }
