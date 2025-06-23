@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RequestMapping("/utenti")
 @RestController
@@ -88,12 +89,18 @@ public class UtenteController {
         // authentication.getName() restituisce la matricola dell'utente, come configurato
         // in UserDetails (Utente.java -> getUsername()) e JwtAuthenticationFilter.
         String matricola = authentication.getName(); 
+        Utente utente = utenteRepository.findByMatricola(matricola).get();
+        String nome = utente.getNome();
+        String cognome = utente.getCognome();
+
+
 
         // Prepara un semplice frammento HTML per la visualizzazione della matricola.
         // HtmlUtils.htmlEscape è usato per prevenire attacchi XSS.
         String htmlResponse = String.format(
             "<div id='matricola-display' style='font-weight: bold; color: #333;'>Matricola: %s</div>",
-            HtmlUtils.htmlEscape(matricola)
+         HtmlUtils.htmlEscape(matricola + " \n Nome: " + nome + "\n Cognome: " + cognome).replace("\n", "<br>")
+
         );
         
         // Restituisce il frammento HTML con stato HTTP 200 OK.

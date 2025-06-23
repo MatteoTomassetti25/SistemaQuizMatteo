@@ -239,14 +239,14 @@
             hx-swap="innerHTML"
             hx-trigger="submit"
             hx-ext="json-enc" hx-indicator="#spinner-submit"
-            hx-on:htmx:before-request="document.getElementById('hiddenCodiceVal').value = editor.getValue(); clearErrorMarkers();" hx-on::after-swap="document.getElementById('consegna-domanda').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+            hx-on:htmx:before-request="clearErrorMarkers();" hx-on::after-swap="document.getElementById('consegna-domanda').scrollIntoView({ behavior: 'smooth', block: 'start' })">
 
             <input type="hidden" name="codice" id="hiddenCodiceVal">
 
             <div class="form-section">
                 <label for="idDomanda">ID Domanda:</label>
                 <div>
-                    <input  id="idDomanda" name="idDomanda" type="number" hx-trigger="input changed delay:500ms"
+                    <input id="idDomanda" name="idDomanda" type="number" hx-trigger="input changed delay:500ms"
                         hx-get="/mostraDomanda" hx-target="#consegna-domanda" hx-include="this"
                         hx-indicator="#spinner-load"
                         hx-on:htmx:before-request="document.getElementById('risultato').innerHTML = ''">
@@ -264,7 +264,7 @@
             </div>
 
             <div id="risultato">
-                </div>
+            </div>
 
             <div class="form-section">
                 <label for="editor">Il Tuo Codice Java:</label>
@@ -284,28 +284,32 @@
     </div>
 
     <script>
-        var editor, testEditor;
+        var editor, testEditor; // Variabili globali per gli editor Ace
         var Range = ace.require('ace/range').Range;
         window.mainEditorMarker = null;
         window.testEditorMarker = null;
 
         document.addEventListener('DOMContentLoaded', function () {
+            // Inizializzazione dell'editor per il codice dell'utente
             editor = ace.edit("editor");
             editor.setTheme("ace/theme/eclipse");
             editor.session.setMode("ace/mode/java");
             editor.setOptions({ enableBasicAutocompletion: true, enableSnippets: true, enableLiveAutocompletion: true, fontSize: "14px", useWorker: false });
 
+            // Inizializzazione dell'editor per il codice di test (sola lettura)
             testEditor = ace.edit("testEditor");
             testEditor.setTheme("ace/theme/eclipse");
             testEditor.session.setMode("ace/mode/java");
             testEditor.setReadOnly(true);
             testEditor.setOptions({ fontSize: "14px", highlightActiveLine: false, highlightGutterLine: false, useWorker: false });
 
+            // Contenuto iniziale per l'editor dei test
             const initialTestContent = "// Il codice del test associato alla domanda verrà caricato qui dopo aver inserito un ID Domanda valido.";
-            if (testEditor.getValue() === "") {
+            if (testEditor.getValue() === "" || testEditor.getValue().trim() === "// Il codice del test associato alla domanda verrà caricato qui.") {
                 testEditor.setValue(initialTestContent, -1);
             }
 
+            // Listener per HTMX per caricare il codice di test quando l'ID Domanda cambia
             var testLoaderDiv = document.querySelector('div[hx-get="/mostraTest"]');
             if(testLoaderDiv) {
                 testLoaderDiv.addEventListener('htmx:afterRequest', function(event) {
@@ -318,6 +322,7 @@
                     } else {
                         testEditor.setValue("// Errore nel caricamento del test: " + event.detail.xhr.statusText, -1);
                     }
+                     // Pulisce eventuali marker di errore precedenti nell'editor dei test
                      if (window.testEditorMarker) {
                          testEditor.session.removeMarker(window.testEditorMarker);
                          window.testEditorMarker = null;
@@ -325,18 +330,53 @@
                      testEditor.session.clearAnnotations();
                 });
             }
+
+            // NUOVO LISTENER: htmx:configRequest
+            // Questo listener viene eseguito prima che HTMX invii la richiesta.
+            // Qui impostiamo il valore del codice dall'editor Ace.
+            document.body.addEventListener('htmx:configRequest', function(evt) {
+                const triggeringElement = evt.detail.elt; // L'elemento che ha scatenato la richiesta (il form)
+                
+                // Verifica che l'evento provenga dal form corretto
+                if (triggeringElement && triggeringElement.id === 'testForm') {
+                    if (window.editor) { // Verifica che l'editor sia stato inizializzato
+                        const codiceValue = window.editor.getValue(); // Ottiene il valore corrente dall'editor Ace
+                        
+                        // 1. Aggiorna il campo nascosto nel DOM.
+                        // Questo assicura che il DOM sia consistente.
+                        const hiddenInput = triggeringElement.querySelector('#hiddenCodiceVal');
+                        if (hiddenInput) {
+                            hiddenInput.value = codiceValue;
+                        }
+
+                        // 2. Modifica i parametri che HTMX invierà.
+                        // L'estensione json-enc userà questi parametri per costruire il corpo JSON della richiesta.
+                        if (evt.detail.parameters) {
+                            evt.detail.parameters.codice = codiceValue;
+                        } else {
+                            // Fallback se evt.detail.parameters non fosse inizializzato (improbabile con json-enc e POST)
+                            evt.detail.parameters = { codice: codiceValue };
+                        }
+                        // Nota: json-enc raccoglierà anche gli altri campi del form, come 'idDomanda',
+                        // basandosi sui loro attributi 'name'.
+                    }
+                }
+            });
         });
 
+        // Funzione per gestire il click su un errore (evidenzia la riga nell'editor)
         function handleErrorClick(editorName, lineNum, message, type) {
             var editorInstance = (editorName === 'editor') ? window.editor : window.testEditor;
-            const aceLine = lineNum - 1;
+            const aceLine = lineNum - 1; // Le righe in Ace sono 0-based
 
+            // Verifica che il numero di riga sia valido
             if (aceLine < 0 || aceLine >= editorInstance.session.getLength()) {
                  console.warn("handleErrorClick: Numero di riga (" + lineNum + ") fuori dai limiti per l'editor " + editorName);
                 return;
             }
             var markerIdRef = (editorName === 'editor') ? 'mainEditorMarker' : 'testEditorMarker';
 
+            // Rimuove eventuali marker di errore precedenti
             if (window[markerIdRef]) {
                 try {
                     editorInstance.session.removeMarker(window[markerIdRef]);
@@ -346,25 +386,29 @@
                 window[markerIdRef] = null;
             }
 
+            // Rimuove eventuali annotazioni precedenti
             try {
                 editorInstance.session.clearAnnotations();
             } catch (e) {
                 console.warn(`Errore durante la pulizia delle annotazioni:`, e);
             }
 
+            // Aggiunge la nuova annotazione e il marker
             try {
                 editorInstance.session.setAnnotations([{ row: aceLine, column: 0, text: message, type: type }]);
                 const lineLength = editorInstance.session.getLine(aceLine).length;
-                const markerRange = new Range(aceLine, 0, aceLine, Math.max(1, lineLength));
+                const markerRange = new Range(aceLine, 0, aceLine, Math.max(1, lineLength)); // Assicura che il range sia valido anche per righe vuote
                 const newMarkerId = editorInstance.session.addMarker(markerRange, 'ace_error-line', 'fullLine', true);
-                window[markerIdRef] = newMarkerId;
+                window[markerIdRef] = newMarkerId; // Salva l'ID del nuovo marker
 
+                // Fa lo scroll alla riga dell'errore e imposta il focus sull'editor
                 setTimeout(() => {
                     try {
                         editorInstance.scrollToLine(lineNum, true, true, function () { });
                         editorInstance.gotoLine(lineNum, 0, true);
                         editorInstance.focus();
 
+                        // Se l'errore è nell'editor dei test, fa lo scroll anche del contenitore dell'editor
                         if (editorName === 'testEditor') {
                             const el = document.getElementById('testEditor');
                             if (el && typeof el.scrollIntoView === 'function') { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
@@ -377,14 +421,9 @@
             }
         }
 
+        // Funzione per pulire i marker di errore da entrambi gli editor
         function clearErrorMarkers() {
-            // Popola il campo nascosto del codice prima di pulire i marker,
-            // anche se hx-on:htmx:before-request dovrebbe già farlo.
-            // Potrebbe essere ridondante ma innocuo.
-            if (window.editor) {
-                 // document.getElementById('hiddenCodiceVal').value = editor.getValue(); // Opzionale qui
-            }
-
+            // Pulisce l'editor principale
             if (window.editor && window.editor.session) {
                 if (window.mainEditorMarker) {
                     window.editor.session.removeMarker(window.mainEditorMarker);
@@ -393,6 +432,7 @@
                 window.editor.session.clearAnnotations();
             }
 
+            // Pulisce l'editor dei test
             if (window.testEditor && window.testEditor.session) {
                 if (window.testEditorMarker) {
                      window.testEditor.session.removeMarker(window.testEditorMarker);
